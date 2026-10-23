@@ -25,6 +25,8 @@ Checks:
 - there is no baseball app icon (no assets/icons/mlb-*, no reference to one).
 - the privacy blocks don't mention data the worker no longer stores (user-agent).
 - dist/_worker.js passes scripts/worker-test.mjs (run in node with fake KV and ASSETS).
+- dist/_redirects keeps the /draftmatrix-site rules and has a 301 from /x/ to /x
+  for every flat legacy page (and there's no dist/x/index.html to loop with).
 - functions/ is gone, and dist/ stays under the size budget.
 """
 import random
@@ -122,6 +124,20 @@ def check_files():
                       and MAILTO.encode() in m.group(0)):
                 fail(f"{out}: support email isn't right after the GitHub link in the Contact line")
         scanned[f"{out} (added block)"] = b"".join(blocks + [m.group(0) for m in inline]).decode()
+
+    redirects = (DIST / "_redirects").read_text().splitlines()
+    for rule in ["/draftmatrix-site /support 301", "/draftmatrix-site/ /support 301",
+                 "/draftmatrix-site/index.html /support 301", "/draftmatrix-site/* /:splat 301"]:
+        if rule not in redirects:
+            fail(f"_redirects missing {rule!r}")
+    for out in LEGACY.values():
+        name = out[: -len(".html")]
+        rule = f"/{name}/ /{name} 301"
+        if rule not in redirects:
+            fail(f"_redirects missing {rule!r}")
+        if (DIST / name / "index.html").exists():
+            fail(f"dist/{name}/index.html exists, so /{name}/ -> /{name} would loop")
+    print(f"_redirects: {len(redirects)} rules")
 
     if (ROOT / "functions").exists():
         fail("functions/ still exists")

@@ -479,11 +479,18 @@ function build() {
   // Pages already serves /support.html at /support (pretty URLs), so a
   // /support -> /support.html rule would loop. The legacy GitHub Pages paths
   // point straight at the bare paths to save a hop.
+  // Flat legacy pages (support.html etc.) have no /x/index.html, so /x/ is a
+  // 404 on Pages; send it to /x. No loop: /x serves x.html directly.
+  const slashRules = Object.values(LEGACY).map((page) => page.out)
+    .filter((out) => out.endsWith(".html") && !out.endsWith("index.html"))
+    .map((out) => out.slice(0, -".html".length))
+    .map((name) => `/${name}/ /${name} 301`);
   writeFileSync(join(DIST, "_redirects"), [
     "/draftmatrix-site /support 301",
     "/draftmatrix-site/ /support 301",
     "/draftmatrix-site/index.html /support 301",
     "/draftmatrix-site/* /:splat 301",
+    ...slashRules,
     "",
   ].join("\n"));
 
