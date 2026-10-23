@@ -1,0 +1,6 @@
+dist/
+.work/
+.DS_Store
+# exports from scripts/export-*.mjs (personal data)
+signups.csv
+feedback.csv

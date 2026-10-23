@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d2430"/><stop offset="1" stop-color="#0b0f14"/></linearGradient>
+<linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/></linearGradient>
+</defs>
+<rect width="64" height="64" rx="14" fill="url(#bg)"/>
+<g opacity="1"><rect x="10" y="15" width="13" height="9" rx="3" fill="#ff5e7d"/><rect x="10" y="15" width="13" height="9" rx="3" fill="url(#gloss)"/></g>
+<g opacity="1"><rect x="25.5" y="15" width="13" height="9" rx="3" fill="#3fde9b"/><rect x="25.5" y="15" width="13" height="9" rx="3" fill="url(#gloss)"/></g>
+<g opacity="1"><rect x="41" y="15" width="13" height="9" rx="3" fill="#4eb9ff"/><rect x="41" y="15" width="13" height="9" rx="3" fill="url(#gloss)"/></g>
+<g opacity="0.5"><rect x="10" y="28" width="13" height="9" rx="3" fill="#ff5e7d"/><rect x="10" y="28" width="13" height="9" rx="3" fill="url(#gloss)"/></g>
+<g opacity="0.5"><rect x="25.5" y="28" width="13" height="9" rx="3" fill="#3fde9b"/><rect x="25.5" y="28" width="13" height="9" rx="3" fill="url(#gloss)"/></g>
+<g opacity="0.5"><rect x="41" y="28" width="13" height="9" rx="3" fill="#4eb9ff"/><rect x="41" y="28" width="13" height="9" rx="3" fill="url(#gloss)"/></g>
+<g opacity="0.24"><rect x="10" y="41" width="13" height="9" rx="3" fill="#ff5e7d"/><rect x="10" y="41" width="13" height="9" rx="3" fill="url(#gloss)"/></g>
+<g opacity="0.24"><rect x="25.5" y="41" width="13" height="9" rx="3" fill="#3fde9b"/><rect x="25.5" y="41" width="13" height="9" rx="3" fill="url(#gloss)"/></g>
+<g opacity="0.24"><rect x="41" y="41" width="13" height="9" rx="3" fill="#4eb9ff"/><rect x="41" y="41" width="13" height="9" rx="3" fill="url(#gloss)"/></g>
+</svg>
