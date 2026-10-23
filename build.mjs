@@ -8,10 +8,11 @@
 //   <!-- dm-added:end --> just before the closing footer lines. The old
 //   index.html (football support) becomes support.html; the new home page is
 //   index.html.
-// - Two small inline additions, each wrapped in <!-- dm-inline:start --> and
-//   <!-- dm-inline:end --> on one line: the support email link right after the
-//   GitHub link in each privacy page's Contact paragraph, and the motif favicon
-//   links just before </head> on baseball.html and baseball-privacy.html.
+// - Two small inline edits, each wrapped in <!-- dm-inline:start --> and
+//   <!-- dm-inline:end --> on one line: each privacy page's Contact sentence is
+//   replaced by one naming only the support email and support page (no GitHub),
+//   and the motif favicon links go just before </head> on baseball.html and
+//   baseball-privacy.html.
 // - src/_worker.js becomes dist/_worker.js (Pages advanced mode) and handles
 //   /api/subscribe and /api/feedback. There is no functions/ directory.
 // - Both forms carry a Turnstile widget; the Turnstile script is added only to
@@ -342,12 +343,20 @@ function insertInline(src, html, at, text) {
   return html.slice(0, at) + `<!-- dm-inline:start -->${text}<!-- dm-inline:end -->` + html.slice(at);
 }
 
-// Adds the support email right after the GitHub link in the Contact paragraph:
-// "Reach us via github.com/grout58, by email at …, or the support page".
-function addContactEmail(src, html) {
+// The legacy Contact sentence, which scripts/check.py matches in the source too.
+// privacy.html wraps it over two lines and doesn't link the support page.
+const LEGACY_CONTACT = /Reach us via <a href="https:\/\/github\.com\/grout58">github\.com\/grout58<\/a>\s+or the (?:<a href="[\w-]+\.html">support page<\/a>|support page) linked from the App Store listing\./;
+
+// Replaces the Contact sentence with one naming only the support email and the
+// support page: "Questions? Email us at …, or use the support page linked from
+// the App Store listing." The replacement sits between dm-inline markers.
+function replaceContact(src, html, support) {
   const contact = html.indexOf("<h2>Contact</h2>");
-  const link = contact < 0 ? -1 : html.indexOf(GITHUB, contact);
-  return insertInline(src, html, link < 0 ? -1 : link + GITHUB.length, `, by email at ${MAILTO},`);
+  const m = contact < 0 ? null : LEGACY_CONTACT.exec(html.slice(contact));
+  if (!m) throw new Error(`no Contact sentence in ${src}`);
+  const at = contact + m.index;
+  return insertInline(src, html.slice(0, at) + html.slice(at + m[0].length), at,
+    `Email us at ${MAILTO}, or use the <a href="${support}">support page</a> linked from the App Store listing.`);
 }
 
 function iconLinks(icon) {
@@ -449,7 +458,7 @@ function build() {
     const html = readFileSync(join(ROOT, src), "utf8");
     const section = page.add === "contact" ? contactSection(page.app) : privacySection(page.support);
     let out = inject(src, html, section);
-    if (page.add === "privacy" && MAILTO) out = addContactEmail(src, out);
+    if (page.add === "privacy" && MAILTO) out = replaceContact(src, out, page.support);
     if (page.icon) out = insertInline(src, out, out.indexOf("</head>"), iconLinks(page.icon));
     writeFileSync(join(DIST, page.out), out);
   }

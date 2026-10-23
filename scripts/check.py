@@ -7,11 +7,14 @@
 Checks:
 - each legacy page in dist/ is its source plus exactly one injected block between
   <!-- dm-added:start --> and <!-- dm-added:end -->; with that block cut out, the
-  bytes match the source exactly, after also cutting out the one-line additions
-  between <!-- dm-inline:start --> and <!-- dm-inline:end -->: the support email
-  right after the GitHub link in each privacy page's Contact line, and the motif
-  favicon links in the two baseball pages' <head>. Nothing else may differ. The
-  legacy sources themselves are unmodified.
+  bytes match the source exactly, after also cutting out the one-line edits
+  between <!-- dm-inline:start --> and <!-- dm-inline:end -->: the motif favicon
+  links in the two baseball pages' <head>, and on each privacy page the new
+  Contact sentence (email + support page), compared against the source with its
+  old GitHub Contact sentence cut out. Nothing else may differ. The legacy
+  sources themselves are unmodified.
+- no "github.com/grout58" text or link is left on the four dist privacy pages
+  (support pages keep GitHub as a secondary contact).
 - support@draftmatrix.app is a mailto: link on all 4 support and all 4 privacy
   pages (privacy: in the Contact line and in the deletion sentence), and no
   "SUPPORT_EMAIL" placeholder text or comment is left anywhere in dist/.
@@ -64,7 +67,12 @@ INLINE_EXPECTED = {
 }
 SUPPORT_EMAIL = "support@draftmatrix.app"
 MAILTO = f'<a href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a>'
-GITHUB = b'<a href="https://github.com/grout58">github.com/grout58</a>'
+# The legacy privacy Contact sentence (same pattern as LEGACY_CONTACT in build.mjs).
+LEGACY_CONTACT = re.compile(
+    rb'Reach us via <a href="https://github\.com/grout58">github\.com/grout58</a>\s+or the '
+    rb'(?:<a href="[\w-]+\.html">support page</a>|support page) linked from the App Store listing\.')
+SUPPORT_PAGE = {"privacy.html": "support.html", "hockey-privacy.html": "hockey.html",
+                "basketball-privacy.html": "basketball.html", "baseball-privacy.html": "baseball.html"}
 MOTIF_ICONS = ['href="/assets/icons/motif.svg"', 'href="/assets/icons/motif-64.png"',
                'rel="apple-touch-icon" href="/assets/icons/motif-180.png"']
 BRANDS = re.compile(
@@ -105,7 +113,13 @@ def check_files():
         source, built = (ROOT / src).read_bytes(), (DIST / out).read_bytes()
         blocks = ADDED.findall(built)
         inline = list(INLINE.finditer(built))
-        same = INLINE.sub(b"", ADDED.sub(b"", built)) == source
+        expected = source
+        if out in SUPPORT_PAGE:
+            old = LEGACY_CONTACT.findall(source)
+            if len(old) != 1:
+                fail(f"{src}: expected 1 legacy Contact sentence, found {len(old)}")
+            expected = LEGACY_CONTACT.sub(b"", source, count=1)
+        same = INLINE.sub(b"", ADDED.sub(b"", built)) == expected
         print(f"cmp {src} dist/{out} minus {len(blocks)} added block(s), {len(inline)} inline: "
               f"{'identical' if same else 'DIFFERENT'}")
         if len(blocks) != 1:
@@ -120,9 +134,17 @@ def check_files():
             if b"motif" in m.group(0):
                 if not built[m.end():].startswith(b"</head>"):
                     fail(f"{out}: favicon links aren't just before </head>")
-            elif not (built[:m.start()].endswith(GITHUB) and b"<h2>Contact</h2>" in built[m.start() - 300:m.start()]
-                      and MAILTO.encode() in m.group(0)):
-                fail(f"{out}: support email isn't right after the GitHub link in the Contact line")
+            else:
+                want = (f'Email us at {MAILTO}, or use the <a href="{SUPPORT_PAGE[out]}">support page</a> '
+                        f'linked from the App Store listing.')
+                if not (built[:m.start()].endswith(b"Questions? ") and b"<h2>Contact</h2>" in built[m.start() - 300:m.start()]
+                        and m.group(0) == f"<!-- dm-inline:start -->{want}<!-- dm-inline:end -->".encode()):
+                    fail(f"{out}: Contact sentence isn't the expected email + support page replacement")
+        if out in SUPPORT_PAGE:
+            hits = built.lower().count(b"github.com/grout58")
+            print(f"github.com/grout58 in dist/{out}: {hits}")
+            if hits:
+                fail(f"{out} still mentions github.com/grout58")
         scanned[f"{out} (added block)"] = b"".join(blocks + [m.group(0) for m in inline]).decode()
 
     redirects = (DIST / "_redirects").read_text().splitlines()
