@@ -1,0 +1,219 @@
+/* DraftMatrix site — one shared stylesheet. System fonts only, light + dark. */
+
+:root {
+  --bg: #ffffff;
+  --bg-alt: #f4f5f7;
+  --card: #ffffff;
+  --text: #16181d;
+  --muted: #555b66;
+  --line: #dfe2e7;
+  --link: #0a5bd6;
+  --accent: #0a5bd6;
+  --accent-text: #ffffff;
+  --ok: #157a46;
+  --warn: #9a5b00;
+  --err: #b3261e;
+  /* the family icon's tier-grid columns */
+  --tier-1: #ff5c7a;
+  --tier-2: #3ddc97;
+  --tier-3: #4cb8ff;
+  --radius: 14px;
+  --wrap: 1080px;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d0f13;
+    --bg-alt: #151820;
+    --card: #181b23;
+    --text: #f2f3f5;
+    --muted: #a7adb8;
+    --line: #2a2f3a;
+    --link: #6cb6ff;
+    --accent: #4c9dff;
+    --accent-text: #06101f;
+    --ok: #4cd08a;
+    --warn: #f0b45a;
+    --err: #ff8a80;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 17px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+img { max-width: 100%; height: auto; display: block; }
+
+a { color: var(--link); }
+a:hover { text-decoration-thickness: 2px; }
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 20px; }
+
+.skip {
+  position: absolute; left: -9999px; top: 0;
+  background: var(--accent); color: var(--accent-text); padding: 8px 14px; z-index: 10;
+}
+.skip:focus { left: 8px; top: 8px; }
+
+/* ---------- header ---------- */
+
+.site-header { border-bottom: 1px solid var(--line); }
+.site-header .wrap {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 8px 20px; padding-top: 12px; padding-bottom: 12px;
+}
+.brand {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-weight: 700; font-size: 1.1rem; color: var(--text); text-decoration: none;
+}
+.brand img { width: 32px; height: 32px; border-radius: 8px; }
+.site-nav ul { display: flex; flex-wrap: wrap; gap: 4px 18px; list-style: none; margin: 0; padding: 0; }
+.site-nav a { color: var(--muted); text-decoration: none; font-size: .95rem; padding: 6px 0; display: inline-block; }
+.site-nav a:hover, .site-nav a[aria-current="page"] { color: var(--text); }
+.site-nav a[aria-current="page"] { font-weight: 600; }
+
+/* ---------- type ---------- */
+
+h1, h2, h3 { line-height: 1.15; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2rem, 5vw, 3.1rem); margin: 0 0 16px; }
+h2 { font-size: clamp(1.5rem, 3.2vw, 2rem); margin: 0 0 12px; }
+h3 { font-size: 1.15rem; margin: 0 0 6px; }
+p { margin: 0 0 14px; }
+.lede { font-size: 1.2rem; color: var(--muted); max-width: 40em; }
+.muted { color: var(--muted); }
+.small { font-size: .9rem; }
+
+/* ---------- sections ---------- */
+
+section { padding: 56px 0; }
+section.alt { background: var(--bg-alt); }
+.section-head { max-width: 46em; margin-bottom: 28px; }
+
+.tierbar { display: flex; gap: 6px; margin-bottom: 18px; }
+.tierbar span { width: 28px; height: 6px; border-radius: 3px; }
+.tierbar span:nth-child(1) { background: var(--tier-1); }
+.tierbar span:nth-child(2) { background: var(--tier-2); }
+.tierbar span:nth-child(3) { background: var(--tier-3); }
+
+/* ---------- hero ---------- */
+
+.hero { padding: 48px 0 40px; }
+.hero .wrap { display: grid; gap: 36px; align-items: center; }
+.pitch {
+  display: inline-block; font-weight: 600; font-size: 1.1rem;
+  border-left: 4px solid var(--tier-2); padding: 4px 0 4px 12px; margin: 4px 0 20px;
+}
+.hero-shots { display: flex; gap: 12px; justify-content: center; align-items: flex-end; }
+.hero-shots img { width: 31%; max-width: 230px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+.hero-shots img:nth-child(2) { transform: translateY(-18px); }
+.hero-shots.single img { width: 100%; max-width: 560px; transform: none; }
+
+@media (min-width: 880px) {
+  .hero .wrap { grid-template-columns: 1fr 1.05fr; }
+}
+
+.cta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 8px; }
+
+/* App Store badge: Apple's artwork, unmodified, min 40px tall, clear space around it */
+.badge { display: inline-block; padding: 10px 0; line-height: 0; }
+.badge img { height: 44px; width: auto; }
+
+/* ---------- screenshots strip ---------- */
+
+.shots {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(180px, 230px);
+  gap: 16px; overflow-x: auto; padding: 4px 4px 16px; scroll-snap-type: x mandatory;
+}
+.shots img { border-radius: 12px; border: 1px solid var(--line); scroll-snap-align: start; }
+.shots .ipad { grid-column: span 2; }
+.shots figure { margin: 0; }
+
+/* ---------- cards ---------- */
+
+.grid { display: grid; gap: 18px; }
+@media (min-width: 640px) { .grid.two { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 900px) { .grid.four { grid-template-columns: repeat(4, 1fr); } .grid.three { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 640px) and (max-width: 899px) { .grid.four, .grid.three { grid-template-columns: 1fr 1fr; } }
+
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 20px; display: flex; flex-direction: column;
+}
+.card h3 a { color: var(--text); text-decoration: none; }
+.card h3 a:hover { text-decoration: underline; }
+.card .card-icon { width: 72px; height: 72px; border-radius: 16px; margin-bottom: 14px; }.card .grow { flex: 1; }
+.card .links { font-size: .95rem; margin: 6px 0 0; }
+.tag {
+  display: inline-block; font-size: .8rem; font-weight: 600; letter-spacing: .02em;
+  padding: 3px 10px; border-radius: 999px; background: var(--bg-alt); color: var(--muted);
+  border: 1px solid var(--line); margin-bottom: 10px; align-self: flex-start;
+}
+
+.features { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
+@media (min-width: 720px) { .features { grid-template-columns: 1fr 1fr; gap: 16px 32px; } }
+.features li { padding-left: 18px; position: relative; }
+.features li::before {
+  content: ""; position: absolute; left: 0; top: .6em; width: 8px; height: 8px; border-radius: 2px; background: var(--tier-3);
+}
+.features strong { display: block; }
+
+/* ---------- pricing ---------- */
+
+.price-table { display: grid; gap: 18px; }
+@media (min-width: 720px) { .price-table { grid-template-columns: 1fr 1fr; } }
+.price-table ul { margin: 0; padding-left: 20px; }
+.price-table li { margin-bottom: 6px; }
+
+/* ---------- FAQ ---------- */
+
+.faq dt { font-weight: 600; margin-top: 18px; }
+.faq dd { margin: 4px 0 0; color: var(--muted); }
+
+/* ---------- signup ---------- */
+
+.signup-box {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 24px; max-width: 640px;
+}
+.signup-form { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.signup-form label.field { flex: 1 1 240px; display: flex; flex-direction: column; gap: 4px; font-size: .9rem; color: var(--muted); }
+.signup-form input[type="email"] {
+  font: inherit; color: var(--text); background: var(--bg);
+  border: 1px solid var(--muted); border-radius: 10px; padding: 11px 12px; min-height: 46px;
+}
+.signup-form button {
+  font: inherit; font-weight: 600; cursor: pointer; align-self: flex-end;
+  background: var(--accent); color: var(--accent-text); border: 0; border-radius: 10px;
+  padding: 11px 20px; min-height: 46px;
+}
+.signup-form button[disabled] { opacity: .6; cursor: progress; }
+.hp { position: absolute !important; left: -10000px !important; width: 1px; height: 1px; overflow: hidden; }
+.signup-status { min-height: 1.5em; margin: 10px 0 0; font-weight: 500; }
+.signup-status.ok { color: var(--ok); }
+.signup-status.warn { color: var(--warn); }
+.signup-status.err { color: var(--err); }
+.signup-note { margin: 8px 0 0; font-size: .85rem; color: var(--muted); }
+
+/* ---------- footer ---------- */
+
+.site-footer { border-top: 1px solid var(--line); padding: 32px 0 48px; font-size: .9rem; color: var(--muted); }
+.site-footer ul { list-style: none; padding: 0; margin: 0 0 14px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.site-footer p { max-width: 52em; }
+
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
