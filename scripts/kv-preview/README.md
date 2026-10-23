@@ -1,6 +1,6 @@
-# API/KV deploy path (stopgap)
+# API/KV deploy path (emergency fallback only)
 
-This is how the live site was first deployed, on 2026-10-23, when wrangler wasn't logged in anywhere and the only tool available could call `api.cloudflare.com` with its own auth. It is a **stopgap**. Use the GitHub Actions + wrangler deploy in [`DEPLOY.md`](../../DEPLOY.md) instead once its secrets are set; that path serves `dist/` as real Pages static assets and doesn't use anything in this directory.
+This is how the live site was first deployed, on 2026-10-23, when wrangler wasn't logged in anywhere and the only tool available could call `api.cloudflare.com` with its own auth. **It is no longer the deploy path.** Since 2026-10-23 production deploys come from GitHub Actions + wrangler on every push to `main` (see [`DEPLOY.md`](../../DEPLOY.md)); that path serves `dist/` as real Pages static assets and doesn't use anything in this directory. Keep this only as an emergency fallback for when Actions can't deploy, and delete the temporary upload Worker afterwards.
 
 How it works: every file in `dist/` (except `_worker.js` and `_routes.json`) lives in a KV namespace bound to the Pages project as `SITE`. The deployment has no static assets (`manifest="{}"`), only a `_worker.js` made of `shim.js` + `dist/_worker.js` (with `export default {` renamed to `const __site = {`) + `tail.js`. The shim serves files out of `SITE` with Pages-like pretty URLs, directory indexes and `_redirects`, never serves anything under `/_`, and passes the real worker a fake `env.ASSETS` backed by KV.
 

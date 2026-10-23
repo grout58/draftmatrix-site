@@ -3,15 +3,16 @@
 ## Current state
 
 - `main` is the source of truth. It is live at https://draftmatrix.app (and www.draftmatrix.app) from the Cloudflare Pages project **draftmatrix-site**.
-- The project is a **Direct Upload** project, created through the Cloudflare API. Cloudflare's docs say a Direct Upload project can't be switched to Git integration later, so the dashboard will never offer "Connect to Git" for it.
-- The live deployment was made through the API/KV stopgap in [`scripts/kv-preview/`](scripts/kv-preview/README.md), because wrangler wasn't logged in anywhere: the files sit in a KV namespace bound as `SITE` and a shim worker serves them.
-- Production bindings on the project: KV `SIGNUPS`, `FEEDBACK` and `SITE`, and the encrypted secret `TURNSTILE_SECRET`. Custom domains: `draftmatrix.app`, `www.draftmatrix.app`.
+- **Every push to `main` deploys to production through GitHub Actions** ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)): build, check, `wrangler pages deploy`. The first Actions deploy was on 2026-10-23 (commit `eada2cc`). To redeploy without a change: Actions → Deploy → Run workflow.
+- The project is a **Direct Upload** project, created through the Cloudflare API. Cloudflare's docs say a Direct Upload project can't be switched to Git integration later, which is why deploys come from Actions rather than Cloudflare's own Git builds.
+- Production bindings on the project: KV `SIGNUPS` and `FEEDBACK`, and the encrypted secret `TURNSTILE_SECRET`. A KV `SITE` binding is still attached but unused; it exists only for the emergency fallback below. Custom domains: `draftmatrix.app`, `www.draftmatrix.app`.
+- Don't use [`scripts/kv-preview/`](scripts/kv-preview/README.md) for normal deploys. It's the API/KV path used before the Actions secrets existed, kept only as a documented emergency fallback.
 
-Pick one of the options below. A is recommended.
+## Deploy path (in use): GitHub Actions + wrangler
 
-## A (recommended): GitHub Actions + wrangler
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs on every push to `main` (and by hand from the Actions tab): `node build.mjs`, `python3 scripts/check.py`, then `npx wrangler@4 pages deploy dist --project-name draftmatrix-site --branch main`. If the token secret is ever removed, the deploy step is skipped with a notice and the job still passes.
 
-[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs on every push to `main` (and by hand from the Actions tab): `node build.mjs`, `python3 scripts/check.py`, then `npx wrangler@4 pages deploy dist --project-name draftmatrix-site --branch main`. Until the token secret exists, the deploy step is skipped with a notice and the job still passes.
+Setup (done on 2026-10-23; repeat when rotating the token):
 
 1. **Create the token.** Cloudflare dashboard → **Manage account** → **Account API tokens** → **Create Token** → **Custom token** → **Get started**. Name it (e.g. "draftmatrix-site GitHub deploy"). Permissions: **Account** / **Cloudflare Pages** / **Edit**. Account Resources: **Include** → this account only. Create it and copy the token (it's shown once).
 2. **Copy the account id**: it's the 32-character hex id in the dashboard URL (`dash.cloudflare.com/<account id>/...`), also under the account's menu → **Copy account ID**.
@@ -24,10 +25,11 @@ Consequences:
 
 - Keeps the existing project, its custom domains, the KV bindings and `TURNSTILE_SECRET`. Nothing in DNS changes.
 - Every push to `main` deploys to production. Deployments show up under the project as usual, with the commit.
-- Pages serves `dist/` as real static assets (pretty URLs, `_redirects`, `_routes.json`), and `dist/_worker.js` gets the real `env.ASSETS`. The KV shim isn't used any more. The `SITE` binding and its namespace can be removed once a wrangler deploy is verified; nothing reads them.
+- Pages serves `dist/` as real static assets (pretty URLs, `_redirects`, `_routes.json`), and `dist/_worker.js` gets the real `env.ASSETS`. The KV shim isn't used. The `SITE` binding is unused unless the emergency fallback is needed.
+- If the deploy step fails with `Authentication failed [code: 9106]` / `Invalid format for Authorization header [code: 6111]`, the `CLOUDFLARE_API_TOKEN` secret value is malformed (stray whitespace or newline, quotes, a `Bearer ` prefix, or the wrong value pasted). Paste the bare token again and re-run the failed run.
 - The token can only edit Pages in this account. Rotate it by creating a new one, updating the secret, and deleting the old token.
 
-## B: Recreate as a Git-connected project
+## Alternative (not in use): recreate as a Git-connected project
 
 1. **Create the project.** Dashboard → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**. This installs the **Cloudflare Workers & Pages** GitHub app: choose **Only select repositories** → `draftmatrix-site`. Then pick the repo and set:
    - Project name: something other than `draftmatrix-site` (e.g. `draftmatrix-web`), unless the old project is deleted first (below)
@@ -46,11 +48,11 @@ Consequences:
 - Between removing the domains from the old project and the new ones becoming active (certificate issuance), the site can be down for a few minutes. Do it at a quiet time.
 - `scripts/export-*.mjs` keep working: the KV namespaces themselves don't move.
 
-## C: Keep the API/KV stopgap
+## Emergency fallback only: API/KV path
 
-Follow [`scripts/kv-preview/README.md`](scripts/kv-preview/README.md) for each deploy: create the temporary upload Worker with an `UPLOAD_NONCE` secret, run `upload.sh`, run `deploy-via-api.js`, delete the upload Worker.
+Only if Actions/wrangler can't deploy (e.g. the token is revoked and can't be replaced quickly). Follow [`scripts/kv-preview/README.md`](scripts/kv-preview/README.md) for each deploy: create the temporary upload Worker with an `UPLOAD_NONCE` secret, run `upload.sh`, run `deploy-via-api.js`, delete the upload Worker.
 
-Consequences: no new tokens or apps, but every deploy is manual, the shim only approximates Pages static serving (pretty URLs, indexes, `_redirects`), every request runs the worker (counts against the Workers request quota) and reads KV, and files deleted from `dist/` stay in KV until deleted by hand.
+Consequences: no new tokens or apps, but every deploy is manual, it needs a broader token (Workers Scripts + KV + Pages edit), the shim only approximates Pages static serving (pretty URLs, indexes, `_redirects`), every request runs the worker (counts against the Workers request quota) and reads KV, and files deleted from `dist/` stay in KV until deleted by hand.
 
 ## Verifying a deploy
 
@@ -60,5 +62,3 @@ python3 scripts/verify-deploy.py dist https://draftmatrix.app   # both arguments
 ```
 
 It fetches every file in `dist/` (except `_worker.js`, `_routes.json`, `_redirects`) at the URL Pages serves it at, compares SHA-256 hashes, checks `/_redirects` and `/_routes.json` are 404 and that each `_redirects` rule answers with its code and target, prints a table, and exits 1 on any failure. Build from the same commit that was deployed, or the hashes won't match. Point it at a preview URL (`https://<hash>.draftmatrix-site.pages.dev`) to check a deployment before it's on the domain.
-
-> **Status (2026-10-23):** the repo secrets are set, so production deploys now come from GitHub Actions on every push to `main`.
