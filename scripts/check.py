@@ -7,7 +7,15 @@
 Checks:
 - each legacy page in dist/ is its source plus exactly one injected block between
   <!-- dm-added:start --> and <!-- dm-added:end -->; with that block cut out, the
-  bytes match the source exactly. The legacy sources themselves are unmodified.
+  bytes match the source exactly, after also cutting out the one-line additions
+  between <!-- dm-inline:start --> and <!-- dm-inline:end -->: the support email
+  right after the GitHub link in each privacy page's Contact line, and the motif
+  favicon links in the two baseball pages' <head>. Nothing else may differ. The
+  legacy sources themselves are unmodified.
+- support@draftmatrix.app is a mailto: link on all 4 support and all 4 privacy
+  pages (privacy: in the Contact line and in the deletion sentence), and no
+  "SUPPORT_EMAIL" placeholder text or comment is left anywhere in dist/.
+- /mlb/ and the two baseball legacy pages use the motif favicon (assets/icons/motif*).
 - the new pages and the injected blocks carry no league or ranking-publisher names
   in visible text, alt/aria text or meta tags (URL slugs like /nfl/ and form values
   are not visible and are allowed).
@@ -44,6 +52,19 @@ NEW = ["index.html", "nfl/index.html", "nba/index.html", "nhl/index.html", "mlb/
 REQUIRED = NEW + list(LEGACY.values()) + ["_redirects", "_routes.json", "_worker.js", "sitemap.xml",
                                           "robots.txt", "assets/site.css", "assets/signup.js", "assets/feedback.js"]
 ADDED = re.compile(rb"<!-- dm-added:start -->\n.*?<!-- dm-added:end -->\n", re.S)
+INLINE = re.compile(rb"<!-- dm-inline:start -->[^\n]*?<!-- dm-inline:end -->")
+# Expected dm-inline additions per legacy page in dist/, in page order.
+INLINE_EXPECTED = {
+    "support.html": [], "hockey.html": [], "basketball.html": [],
+    "baseball.html": ["favicon"],
+    "privacy.html": ["email"], "hockey-privacy.html": ["email"], "basketball-privacy.html": ["email"],
+    "baseball-privacy.html": ["favicon", "email"],
+}
+SUPPORT_EMAIL = "support@draftmatrix.app"
+MAILTO = f'<a href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a>'
+GITHUB = b'<a href="https://github.com/grout58">github.com/grout58</a>'
+MOTIF_ICONS = ['href="/assets/icons/motif.svg"', 'href="/assets/icons/motif-64.png"',
+               'rel="apple-touch-icon" href="/assets/icons/motif-180.png"']
 BRANDS = re.compile(
     r"\b(NFL|NBA|WNBA|NHL|MLB|ESPN|borischen|Boris Chen|fantasyfootballcalculator|"
     r"Fantasy Football Calculator|FantasyPros|Yahoo)\b", re.I)
@@ -81,13 +102,26 @@ def check_files():
     for src, out in LEGACY.items():
         source, built = (ROOT / src).read_bytes(), (DIST / out).read_bytes()
         blocks = ADDED.findall(built)
-        same = ADDED.sub(b"", built) == source
-        print(f"cmp {src} dist/{out} minus {len(blocks)} added block(s): {'identical' if same else 'DIFFERENT'}")
+        inline = list(INLINE.finditer(built))
+        same = INLINE.sub(b"", ADDED.sub(b"", built)) == source
+        print(f"cmp {src} dist/{out} minus {len(blocks)} added block(s), {len(inline)} inline: "
+              f"{'identical' if same else 'DIFFERENT'}")
         if len(blocks) != 1:
             fail(f"{out} has {len(blocks)} added blocks, expected 1")
         if not same:
-            fail(f"{out} differs from {src} outside the added block")
-        scanned[f"{out} (added block)"] = b"".join(blocks).decode()
+            fail(f"{out} differs from {src} outside the added blocks")
+        kinds = ["favicon" if b"motif" in m.group(0) else "email" if SUPPORT_EMAIL.encode() in m.group(0) else "?"
+                 for m in inline]
+        if kinds != INLINE_EXPECTED[out]:
+            fail(f"{out} inline additions {kinds}, expected {INLINE_EXPECTED[out]}")
+        for m in inline:
+            if b"motif" in m.group(0):
+                if not built[m.end():].startswith(b"</head>"):
+                    fail(f"{out}: favicon links aren't just before </head>")
+            elif not (built[:m.start()].endswith(GITHUB) and b"<h2>Contact</h2>" in built[m.start() - 300:m.start()]
+                      and MAILTO.encode() in m.group(0)):
+                fail(f"{out}: support email isn't right after the GitHub link in the Contact line")
+        scanned[f"{out} (added block)"] = b"".join(blocks + [m.group(0) for m in inline]).decode()
 
     if (ROOT / "functions").exists():
         fail("functions/ still exists")
@@ -130,6 +164,33 @@ def check_files():
         for tag in re.findall(r'<script\b[^>]*' + re.escape(TURNSTILE_SCRIPT) + r'[^>]*>', html):
             if not re.search(r"\basync\b", tag) or not re.search(r"\bdefer\b", tag):
                 fail(f"{page}: Turnstile script must be async defer")
+
+    # Support email on every support and privacy page; no placeholder left.
+    for out in LEGACY.values():
+        html = pages[out]
+        block = b"".join(ADDED.findall((DIST / out).read_bytes())).decode()
+        print(f"support email dist/{out}: {html.count(MAILTO)} mailto link(s)")
+        if MAILTO not in block:
+            fail(f"{out}: added block has no mailto link for {SUPPORT_EMAIL}")
+        if "privacy" in out:
+            if html.count(MAILTO) != 2:
+                fail(f"{out}: expected the email in the Contact line and the deletion sentence")
+            if f"ask for deletion by emailing {MAILTO}" not in block:
+                fail(f"{out}: deletion sentence doesn't name {SUPPORT_EMAIL}")
+    for f in DIST.rglob("*"):
+        if f.is_file() and f.suffix in {".html", ".js", ".txt", ".xml", ".json", ".css"} and \
+                re.search(r"SUPPORT_EMAIL|not set", f.read_text(errors="replace")):
+            fail(f"placeholder text left in dist/{f.relative_to(DIST)}")
+
+    # Baseball pages use the motif favicon.
+    for name in ["motif.svg", "motif-64.png", "motif-180.png"]:
+        if not (DIST / "assets" / "icons" / name).is_file():
+            fail(f"missing dist/assets/icons/{name}")
+    for page in ["mlb/index.html", "baseball.html", "baseball-privacy.html"]:
+        missing = [m for m in MOTIF_ICONS if m not in pages[page]]
+        print(f"motif favicon dist/{page}: {'yes' if not missing else 'MISSING'}")
+        if missing:
+            fail(f"{page} lacks motif favicon links {missing}")
 
     # No baseball app icon exists, so none may be shipped or referenced.
     mlb_icons = sorted(p.name for p in (DIST / "assets" / "icons").glob("mlb-*"))

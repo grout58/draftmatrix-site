@@ -132,7 +132,8 @@ Not claimed: Mac or Vision Pro. No Catalyst or "Designed for iPad" setting is in
 
 | Claim | Backed by |
 |---|---|
-| Support pages: contact via github.com/grout58 | The link already on every legacy support page. No email address is given: none exists on the current pages, and `SUPPORT_EMAIL` stays `null` until the owner supplies one |
+| Support pages: email support@draftmatrix.app (primary), GitHub github.com/grout58 (secondary) | Address supplied by the owner (`SUPPORT_EMAIL` in `build.mjs`, 2026-10-23); the GitHub link is the one already on every legacy support page |
+| Privacy pages: "by email at support@draftmatrix.app" in the Contact line, and "ask for deletion by emailing support@draftmatrix.app or through the support page" | Owner approved showing the address on the privacy pages (2026-10-23). Added in the dist copies only, between `dm-inline` markers; the legacy sources are unchanged |
 | Support pages: the feedback form sends name, email, app and message | `src/feedback.js`, `src/_worker.js` (`feedback()`) |
 | Privacy: "The DraftMatrix apps themselves still collect no data. This section covers only the optional forms on the draftmatrix.app website." | Same sources as "No account, no tracking, Data Not Collected" above; the forms exist only on the website |
 | Privacy: the email list stores the address, which sport page(s), and first and latest signup time | `src/_worker.js` `subscribe()` stores `{sport, sports, ts, firstTs}` under `email:<address>` and nothing else (`sports` is every page, `ts` the latest signup, `firstTs` the first). `worker-test.mjs` asserts the record has exactly these keys |
@@ -140,7 +141,7 @@ Not claimed: Mac or Vision Pro. No Catalyst or "Designed for iPad" setting is in
 | Privacy: feedback stores the name (optional), email, the app chosen, the message and the time sent; used only to reply | `src/_worker.js` `feedback()` stores `{name, email, app, message, ts}` and nothing else (the user-agent was dropped on 2026-10-23). `worker-test.mjs` asserts the record has exactly these keys |
 | Privacy: kept until you unsubscribe or ask us to delete; unsubscribe anytime or ask for deletion through the support page | Owner's commitments. Nothing deletes automatically, which matches "kept until". Deletion is manual (dashboard or wrangler). The unsubscribe part depends on the email tool (see Open concerns) |
 | Privacy: both stored with "Cloudflare, our website host" | KV bindings `SIGNUPS` / `FEEDBACK` on the Pages project; `PROVIDER` in `build.mjs` |
-| Privacy: "To block spam, the forms use Cloudflare Turnstile, which checks your browser when you submit" | Owner's wording. Both forms render a Turnstile widget (`build.mjs` `turnstile()`) and the worker verifies the token with siteverify before storing (`verifyTurnstile()`). The token and `CF-Connecting-IP` go to Cloudflare for that check; neither is stored |
+| Privacy: "To block spam, the forms use Cloudflare Turnstile, which checks your browser when you use the forms" | Owner's wording (changed from "when you submit" on 2026-10-23, since the widget runs on page load). Both forms render a Turnstile widget (`build.mjs` `turnstile()`) and the worker verifies the token with siteverify before storing (`verifyTurnstile()`). The token and `CF-Connecting-IP` go to Cloudflare for that check; neither is stored |
 | Privacy: "Added October 23, 2026" | Date the section was rewritten (owner's instruction) |
 | Support pages: "Email address (used only to reply to you)" on the feedback form | Owner's instruction; matches "We use it only to reply to you" on the privacy pages |
 
@@ -152,7 +153,7 @@ Not factual claims, but recorded so nothing looks like it promises more than it 
 |---|---|
 | App icons on the home cards, sport heroes, favicons, touch icons and OG images | The real 1024px App Store icons supplied in `.work/icon-{nfl,nba,nhl}-1024.png`, resized only (`scripts/icons.py`). Nothing drawn on them |
 | Sport page tints | Each icon's background: football `#07170d`→`#284a33`, hoops `#130e08`→`#2f1e13`, hockey `#071019`→`#233851` (owner-supplied values, matching the icons) |
-| Baseball: no icon anywhere | No baseball icon has been released. `assets/icons/mlb-*` was removed, and `check.py` fails if one returns. The baseball page, card and OG image use the brand tile motif on the neutral `#0b0f14`→`#1d2430` background |
+| Baseball: no icon anywhere | No baseball icon has been released. `assets/icons/mlb-*` was removed, and `check.py` fails if one returns. The baseball page, card and OG image use the brand tile motif on the neutral `#0b0f14`→`#1d2430` background. `/mlb/` and the dist copies of `baseball.html` / `baseball-privacy.html` use a motif favicon and touch icon (`assets/icons/motif.svg`, `motif-64.png`, `motif-180.png`, drawn by `scripts/motif_icon.py`), not the football icon and not a baseball app icon |
 | The tile motif (CSS, header SVG, OG drawings) | A generic brand pattern after the icons' tier grid, with no sport ball. It's decorative (`aria-hidden`) and not presented as an app icon |
 | "Tier 1 / Tier 2 / Tier 3" chips and section chips ("In person", "The apps", "Pricing", "Features", "Screenshots", "FAQ", "Planned") | Decorative labels (the hero chips are `aria-hidden`). They make no claim |
 | OG images | Real App Store screenshots and real icons (football, hoops, hockey); baseball uses the motif. Text is the same as before |
@@ -217,4 +218,10 @@ Checked against App Store Review Guidelines concerns (accurate marketing, privac
 - *Retention* (borderline above): resolved in wording. The section now says "kept until you unsubscribe or ask us to delete them".
 - *Cloudflare's own logs* (borderline above): partly addressed. The Turnstile sentence links to Cloudflare's privacy policy. The section still describes only what we store, not what Cloudflare logs as host.
 - *Turnstile* is the one third-party script. It loads only on the home, sport and support pages (the pages with forms). It sends the visitor's browser signals to Cloudflare when the widget runs, which is on page load, not only "when you submit" as the owner's sentence says. Managed mode decides by itself whether to show a checkbox. The wording is the owner's, kept as given; consider "when you use the forms" if you want it exact.
-- Still open: the legacy "collects no personal data" headline and August effective date, the unsubscribe promise (no email tool yet), the GitHub-only contact, and the hero price wording.
+- Still open: the legacy "collects no personal data" headline and August effective date, the unsubscribe promise (no email tool yet), and the hero price wording.
+
+**Follow-up, end of 2026-10-23**
+
+- *Support contact* (borderline above): resolved. support@draftmatrix.app is the primary contact on all four support pages and is added to the four privacy pages' Contact line and deletion sentence. The `SUPPORT_EMAIL not set` comment and warning are gone from the built site. Make sure the mailbox actually receives mail before deploying.
+- *Turnstile wording*: now "when you use the forms".
+- *Baseball favicon*: the brand motif instead of the football icon.

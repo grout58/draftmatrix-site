@@ -17,7 +17,7 @@ The marketing and support site for the DraftMatrix apps, for Cloudflare Pages at
 | `/nfl/` | `#284a33` → `#07170d` | football icon | football icon |
 | `/nba/` | `#2f1e13` → `#130e08` | hoops icon | hoops icon |
 | `/nhl/` | `#233851` → `#071019` | hockey icon | hockey icon |
-| `/mlb/` | `#1d2430` → `#0b0f14` | tile motif (there is no baseball app icon) | football icon (brand level) |
+| `/mlb/` | `#1d2430` → `#0b0f14` | tile motif (there is no baseball app icon) | tile motif (`assets/icons/motif.svg`, `motif-64.png`, `motif-180.png`) |
 
 ```
 build.mjs              build script (SIGNUP_LIVE, SUPPORT_EMAIL, PROVIDER, TURNSTILE_SITEKEY at the top)
@@ -29,6 +29,7 @@ src/_worker.js         Pages worker: POST /api/subscribe, POST /api/feedback (co
 assets/                screenshots, icons, OG images, App Store badges (committed)
 scripts/screens.py     regenerates assets/screens from ../DraftMatrix
 scripts/icons.py       regenerates assets/icons from .work/icon-<sport>-1024.png
+scripts/motif_icon.py  draws assets/icons/motif.svg, motif-64.png, motif-180.png (baseball favicon)
 scripts/og.py          regenerates assets/og/*.png (1200x630)
 scripts/export-signups.mjs   SIGNUPS KV -> signups.csv (Cloudflare REST API)
 scripts/export-feedback.mjs  FEEDBACK KV -> feedback.csv
@@ -62,10 +63,11 @@ What ends up in `dist/`:
 
 ### Sections added to the legacy pages
 
-The sources at the repo root are never edited. The build copies each one and inserts one block, between `<!-- dm-added:start -->` and `<!-- dm-added:end -->`, just before the page's closing lines (the `<footer>` on `support.html` and `privacy.html`, the independence disclaimer on the others). Each block has its own small `<style>` scoped to `.dm-added`, so the rest of the page looks exactly as before. `scripts/check.py` cuts the block out and checks that what's left is byte-identical to the source.
+The sources at the repo root are never edited. The build copies each one and inserts one block, between `<!-- dm-added:start -->` and `<!-- dm-added:end -->`, just before the page's closing lines (the `<footer>` on `support.html` and `privacy.html`, the independence disclaimer on the others). Each block has its own small `<style>` scoped to `.dm-added`, so the rest of the page looks exactly as before. `scripts/check.py` cuts the block (and the inline additions below) out and checks that what's left is byte-identical to the source.
 
-- **Support pages: "Contact us"** with a feedback form (name optional, email, app preselected for the page, message up to 4,000 characters, honeypot) that posts to `/api/feedback`. There is no support email address yet. While `SUPPORT_EMAIL` in `build.mjs` is `null`, the section links to github.com/grout58 and the form, carries an HTML comment `SUPPORT_EMAIL not set`, and the build prints a warning. Set it to an address to show a `mailto:` link instead.
-- **Privacy pages: "Website email list and feedback form"**, dated "Added October 23, 2026", anchor `#email-list`. It opens by saying the apps still collect no data and the section covers only the website's optional forms, then lists exactly the fields the worker stores, what each is used for, retention ("until you unsubscribe or ask us to delete"), and the Turnstile note with a link to Cloudflare's privacy policy. It names where the data is stored from `PROVIDER` in `build.mjs` (now "Cloudflare, our website host"); change that when an email provider is chosen. If the worker ever stores another field, update this section in the same change.
+- **Support pages: "Contact us"**, with `SUPPORT_EMAIL` (support@draftmatrix.app) as a `mailto:` link as the primary contact, then a feedback form (name optional, email, app preselected for the page, message up to 4,000 characters, honeypot) that posts to `/api/feedback`, and github.com/grout58 as a secondary contact. If `SUPPORT_EMAIL` is ever set to `null`, the section falls back to GitHub and the form and the build prints a warning (nothing placeholder-like goes into the pages).
+- **Privacy pages: "Website email list and feedback form"**, dated "Added October 23, 2026", anchor `#email-list`. It opens by saying the apps still collect no data and the section covers only the website's optional forms, then lists exactly the fields the worker stores, what each is used for, retention ("until you unsubscribe or ask us to delete"), and the Turnstile note with a link to Cloudflare's privacy policy. It names where the data is stored from `PROVIDER` in `build.mjs` (now "Cloudflare, our website host"); change that when an email provider is chosen. If the worker ever stores another field, update this section in the same change. Its deletion sentence names the support email.
+- **Inline additions**, each one line between `<!-- dm-inline:start -->` and `<!-- dm-inline:end -->`: on the four privacy pages, ", by email at support@draftmatrix.app," right after the GitHub link in the existing Contact paragraph (owner-approved); on `baseball.html` and `baseball-privacy.html`, the motif favicon links just before `</head>` (those pages had no favicon). `scripts/check.py` cuts these out too, checks where each sits, and checks the email is on all eight pages with no placeholder left.
 
 The legacy pages link to each other relatively (`privacy.html`, `hockey.html`), and those links still resolve because every legacy file sits at the root.
 
@@ -77,7 +79,7 @@ python3 scripts/icons.py     # app icons: 512/256/128 webp+png, 180 touch, 64 fa
 python3 scripts/og.py        # Open Graph images (needs the icons first)
 ```
 
-`scripts/icons.py` reads the 1024px App Store icons from `.work/icon-nfl-1024.png`, `icon-nba-1024.png` and `icon-nhl-1024.png`. `.work/` is not committed, so copy them there first (the current files are JPEG data with a `.png` name; Pillow reads them either way). Baseball has no released icon: there must be no `assets/icons/mlb-*`, and `scripts/check.py` fails if one appears or is referenced. The baseball page, its home card and its OG image use the tile motif instead.
+`scripts/icons.py` reads the 1024px App Store icons from `.work/icon-nfl-1024.png`, `icon-nba-1024.png` and `icon-nhl-1024.png`. `.work/` is not committed, so copy them there first (the current files are JPEG data with a `.png` name; Pillow reads them either way). Baseball has no released icon: there must be no `assets/icons/mlb-*`, and `scripts/check.py` fails if one appears or is referenced. The baseball page, its home card and its OG image use the tile motif instead, and `/mlb/` plus the two baseball legacy pages use the motif favicon from `python3 scripts/motif_icon.py` (no inputs; same geometry as the header SVG).
 
 ## Deploy
 

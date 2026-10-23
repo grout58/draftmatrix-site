@@ -8,6 +8,10 @@
 //   <!-- dm-added:end --> just before the closing footer lines. The old
 //   index.html (football support) becomes support.html; the new home page is
 //   index.html.
+// - Two small inline additions, each wrapped in <!-- dm-inline:start --> and
+//   <!-- dm-inline:end --> on one line: the support email link right after the
+//   GitHub link in each privacy page's Contact paragraph, and the motif favicon
+//   links just before </head> on baseball.html and baseball-privacy.html.
 // - src/_worker.js becomes dist/_worker.js (Pages advanced mode) and handles
 //   /api/subscribe and /api/feedback. There is no functions/ directory.
 // - Both forms carry a Turnstile widget; the Turnstile script is added only to
@@ -21,9 +25,10 @@ import { fileURLToPath } from "node:url";
 // While false, every signup form carries a visible "Preview" note.
 const SIGNUP_LIVE = true;
 
-// Support email for the "Contact us" sections. While null, those sections
-// point to GitHub and the feedback form, and the build warns.
-const SUPPORT_EMAIL = null;
+// Support email: the primary contact in the "Contact us" sections, and added to
+// the privacy pages' Contact line and deletion sentence. If set to null, those
+// fall back to GitHub and the feedback form, and the build warns.
+const SUPPORT_EMAIL = "support@draftmatrix.app";
 
 // Where signups and feedback are stored, as named on the privacy pages.
 const PROVIDER = "Cloudflare, our website host";
@@ -63,8 +68,8 @@ const LEGACY = {
   "hockey-privacy.html": { out: "hockey-privacy.html", add: "privacy", support: "hockey.html" },
   "basketball.html": { out: "basketball.html", add: "contact", app: "hoops" },
   "basketball-privacy.html": { out: "basketball-privacy.html", add: "privacy", support: "basketball.html" },
-  "baseball.html": { out: "baseball.html", add: "contact", app: "baseball" },
-  "baseball-privacy.html": { out: "baseball-privacy.html", add: "privacy", support: "baseball.html" },
+  "baseball.html": { out: "baseball.html", add: "contact", app: "baseball", icon: "motif" },
+  "baseball-privacy.html": { out: "baseball-privacy.html", add: "privacy", support: "baseball.html", icon: "motif" },
 };
 
 // Privacy page whose email-list section each signup form links to.
@@ -143,7 +148,7 @@ const PAGES = [
       "DraftMatrix: Fantasy Baseball is coming in February 2027: a tiered fantasy baseball draft board for iPhone and iPad. Get the free cheat sheet each draft season.",
     og: "mlb",
     theme: "brand",
-    icon: "nfl", // baseball has no released app icon; uses the brand-level favicon
+    icon: "motif", // baseball has no released app icon; the tile motif (scripts/motif_icon.py)
   },
 ];
 
@@ -270,14 +275,14 @@ const ADDED_CSS = `<style>
 </style>`;
 
 const GITHUB = `<a href="https://github.com/grout58">github.com/grout58</a>`;
+const MAILTO = SUPPORT_EMAIL && `<a href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a>`;
 
 function contactSection(app) {
   const options = FEEDBACK_APPS.map(([value, label]) =>
     `<option value="${value}"${value === app ? " selected" : ""}>${label}</option>`).join("");
-  const reach = SUPPORT_EMAIL
-    ? `<p>Email us at <a href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a>, or send a message with the form below.</p>`
-    : `<!-- SUPPORT_EMAIL not set: set SUPPORT_EMAIL in build.mjs to show an email link here. -->
-<p>Reach us on GitHub at ${GITHUB}, or send a message with the form below.</p>`;
+  const reach = MAILTO
+    ? `<p>Email us at ${MAILTO}, or send a message with the form below. You can also reach us on GitHub at ${GITHUB}.</p>`
+    : `<p>Reach us on GitHub at ${GITHUB}, or send a message with the form below.</p>`;
   return `<section class="dm-added" id="dm-contact" aria-labelledby="dm-contact-h">
 ${ADDED_CSS}
 <h2 id="dm-contact-h">Contact us</h2>
@@ -316,8 +321,8 @@ function privacySection(support) {
 <p>The DraftMatrix apps themselves still collect no data. This section covers only the optional forms on the draftmatrix.app website.</p>
 <p><strong>Email list.</strong> If you sign up, we store your email address, which sport page(s) you signed up from, and when you first and most recently signed up. We use it only to send the draft-season cheat sheet and DraftMatrix app news.</p>
 <p><strong>Feedback form.</strong> If you send feedback, we store your name (optional), your email address, the app you chose, your message, and the time you sent it. We use it only to reply to you.</p>
-<p>Both are stored with ${esc(PROVIDER)}, and kept until you unsubscribe or ask us to delete them. You can unsubscribe anytime, or ask for deletion through the <a href="${support}">support page</a>. We never sell or share them.</p>
-<p>To block spam, the forms use Cloudflare Turnstile, which checks your browser when you submit; see <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's privacy policy</a>.</p>
+<p>Both are stored with ${esc(PROVIDER)}, and kept until you unsubscribe or ask us to delete them. You can unsubscribe anytime, or ask for deletion ${MAILTO ? `by emailing ${MAILTO} or ` : ""}through the <a href="${support}">support page</a>. We never sell or share them.</p>
+<p>To block spam, the forms use Cloudflare Turnstile, which checks your browser when you use the forms; see <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's privacy policy</a>.</p>
 </section>`;
 }
 
@@ -328,6 +333,27 @@ function inject(src, html, section) {
     .map((re) => html.search(re)).find((i) => i >= 0);
   if (at === undefined) throw new Error(`no injection point in ${src}`);
   return html.slice(0, at) + `${ADDED_START}\n${section}\n${ADDED_END}\n` + html.slice(at);
+}
+
+// One-line insertion at a fixed point, wrapped in dm-inline markers so
+// scripts/check.py can cut it out again.
+function insertInline(src, html, at, text) {
+  if (at < 0) throw new Error(`no inline insertion point in ${src}`);
+  return html.slice(0, at) + `<!-- dm-inline:start -->${text}<!-- dm-inline:end -->` + html.slice(at);
+}
+
+// Adds the support email right after the GitHub link in the Contact paragraph:
+// "Reach us via github.com/grout58, by email at …, or the support page".
+function addContactEmail(src, html) {
+  const contact = html.indexOf("<h2>Contact</h2>");
+  const link = contact < 0 ? -1 : html.indexOf(GITHUB, contact);
+  return insertInline(src, html, link < 0 ? -1 : link + GITHUB.length, `, by email at ${MAILTO},`);
+}
+
+function iconLinks(icon) {
+  return (icon === "motif" ? `<link rel="icon" href="/assets/icons/motif.svg" type="image/svg+xml">` : "") +
+    `<link rel="icon" href="/assets/icons/${icon}-64.png" type="image/png" sizes="64x64">` +
+    `<link rel="apple-touch-icon" href="/assets/icons/${icon}-180.png">`;
 }
 
 function header(current) {
@@ -373,8 +399,7 @@ function layout(page, body) {
 <link rel="canonical" href="${url}">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="${THEME_COLOR[page.theme]}">
-<link rel="icon" href="/assets/icons/${page.icon}-64.png" type="image/png" sizes="64x64">
-<link rel="apple-touch-icon" href="/assets/icons/${page.icon}-180.png">
+${iconLinks(page.icon)}
 <link rel="stylesheet" href="/assets/site.css">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="DraftMatrix">
@@ -423,9 +448,12 @@ function build() {
   for (const [src, page] of Object.entries(LEGACY)) {
     const html = readFileSync(join(ROOT, src), "utf8");
     const section = page.add === "contact" ? contactSection(page.app) : privacySection(page.support);
-    writeFileSync(join(DIST, page.out), inject(src, html, section));
+    let out = inject(src, html, section);
+    if (page.add === "privacy" && MAILTO) out = addContactEmail(src, out);
+    if (page.icon) out = insertInline(src, out, out.indexOf("</head>"), iconLinks(page.icon));
+    writeFileSync(join(DIST, page.out), out);
   }
-  if (!SUPPORT_EMAIL) console.warn("WARNING: SUPPORT_EMAIL not set; support pages show GitHub + the feedback form.");
+  if (!SUPPORT_EMAIL) console.warn("WARNING: SUPPORT_EMAIL not set; support and privacy pages show GitHub + the feedback form only.");
 
   cpSync(join(ROOT, "assets"), join(DIST, "assets"), { recursive: true });
   copyFileSync(join(ROOT, "src", "site.css"), join(DIST, "assets", "site.css"));
