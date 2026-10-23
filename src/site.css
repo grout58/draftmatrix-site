@@ -208,6 +208,11 @@ section.alt { background: var(--bg-alt); }
 .signup-status.err { color: var(--err); }
 .signup-note { margin: 8px 0 0; font-size: .85rem; color: var(--muted); }
 
+/* Signup right under the home hero, and inside the baseball hero */
+.signup-band { padding: 0 0 48px; }
+.signup-band .signup-box { max-width: 760px; border-left: 4px solid var(--tier-2); }
+.hero .signup-box { margin: 20px 0 12px; }
+
 /* ---------- footer ---------- */
 
 .site-footer { border-top: 1px solid var(--line); padding: 32px 0 48px; font-size: .9rem; color: var(--muted); }

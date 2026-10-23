@@ -2,18 +2,29 @@
 //
 // - New pages live in src/pages/*.html (body content only). This script wraps
 //   each one in the shared head, header and footer.
-// - Legacy pages at the repo root are copied byte-for-byte. The old index.html
-//   (football support) becomes support.html; the new home page is index.html.
-// - functions/ is NOT copied: run `wrangler pages deploy dist` from the repo
-//   root and Pages picks up ./functions from the working directory.
+// - Legacy pages at the repo root are copied unchanged, except that the four
+//   support pages get a "Contact us" + feedback section and the four privacy
+//   pages get an email-list section, each between <!-- dm-added:start --> and
+//   <!-- dm-added:end --> just before the closing footer lines. The old
+//   index.html (football support) becomes support.html; the new home page is
+//   index.html.
+// - src/_worker.js becomes dist/_worker.js (Pages advanced mode) and handles
+//   /api/subscribe and /api/feedback. There is no functions/ directory.
 
 import { cpSync, copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Flip to true once the SIGNUPS KV binding exists in the Pages project.
+// True once the SIGNUPS KV binding exists in the Pages project.
 // While false, every signup form carries a visible "Preview" note.
-const SIGNUP_LIVE = false;
+const SIGNUP_LIVE = true;
+
+// Support email for the "Contact us" sections. While null, those sections
+// point to GitHub and the feedback form, and the build warns.
+const SUPPORT_EMAIL = null;
+
+// Where signups and feedback are stored, as named on the privacy pages.
+const PROVIDER = "Cloudflare, our website host";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const DIST = join(ROOT, "dist");
@@ -33,17 +44,35 @@ const APP_NAME = {
   mlb: "DraftMatrix: Fantasy Baseball",
 };
 
-// Legacy files: source at the repo root -> path in dist. Never edited.
+// Legacy files: source at the repo root -> path in dist. The sources are never
+// edited; `add` names the section injected into the dist copy.
 const LEGACY = {
-  "index.html": "support.html",
-  "privacy.html": "privacy.html",
-  "hockey.html": "hockey.html",
-  "hockey-privacy.html": "hockey-privacy.html",
-  "basketball.html": "basketball.html",
-  "basketball-privacy.html": "basketball-privacy.html",
-  "baseball.html": "baseball.html",
-  "baseball-privacy.html": "baseball-privacy.html",
+  "index.html": { out: "support.html", add: "contact", app: "football" },
+  "privacy.html": { out: "privacy.html", add: "privacy", support: "support.html" },
+  "hockey.html": { out: "hockey.html", add: "contact", app: "hockey" },
+  "hockey-privacy.html": { out: "hockey-privacy.html", add: "privacy", support: "hockey.html" },
+  "basketball.html": { out: "basketball.html", add: "contact", app: "hoops" },
+  "basketball-privacy.html": { out: "basketball-privacy.html", add: "privacy", support: "basketball.html" },
+  "baseball.html": { out: "baseball.html", add: "contact", app: "baseball" },
+  "baseball-privacy.html": { out: "baseball-privacy.html", add: "privacy", support: "baseball.html" },
 };
+
+// Privacy page whose email-list section each signup form links to.
+const PRIVACY = {
+  all: "/privacy.html",
+  nfl: "/privacy.html",
+  nba: "/basketball-privacy.html",
+  nhl: "/hockey-privacy.html",
+  mlb: "/baseball-privacy.html",
+};
+
+const FEEDBACK_APPS = [
+  ["football", "Fantasy Football"],
+  ["hoops", "Fantasy Hoops"],
+  ["hockey", "Fantasy Hockey"],
+  ["baseball", "Fantasy Baseball"],
+  ["other", "Other"],
+];
 
 const PAGES = [
   {
@@ -131,7 +160,7 @@ function signup(sport, heading = "Get the free cheat sheet each draft season") {
   const note = SIGNUP_LIVE ? "" : `\n    <p class="signup-note">Preview: signups aren't live yet.</p>`;
   return `<div class="signup-box">
     <h2 id="${id}-h">${esc(heading)}</h2>
-    <p class="muted">We'll email you the free cheat sheet when draft season starts. Your address is used only for DraftMatrix emails.</p>
+    <p class="muted">We'll email you the free cheat sheet when draft season starts.</p>
     <form class="signup-form" action="/api/subscribe" method="post" data-sport="${sport}" aria-labelledby="${id}-h" novalidate>
       <label class="field" for="${id}-email">Email address
         <input id="${id}-email" name="email" type="email" autocomplete="email" inputmode="email" required>
@@ -143,8 +172,101 @@ function signup(sport, heading = "Get the free cheat sheet each draft season") {
       <input type="hidden" name="sport" value="${sport}">
       <button type="submit">Sign up</button>
     </form>
-    <p class="signup-status" role="status" aria-live="polite"></p>${note}
+    <p class="signup-status" role="status" aria-live="polite"></p>
+    <p class="signup-note">We only use your email for DraftMatrix emails. <a href="${PRIVACY[sport]}#email-list">Privacy</a></p>${note}
   </div>`;
+}
+
+// ---------- sections added to the legacy pages ----------
+
+const ADDED_START = "<!-- dm-added:start -->";
+const ADDED_END = "<!-- dm-added:end -->";
+
+// Self-contained styles, scoped to .dm-added so the legacy page look is untouched.
+const ADDED_CSS = `<style>
+  .dm-added { color-scheme: light dark; margin-top: 2.5rem; padding-top: .5rem; border-top: 1px solid #c7c7cc; }
+  .dm-added form { margin-top: 1rem; }
+  .dm-added label { display: block; margin-top: 14px; font-weight: 600; font-size: .95rem; }
+  .dm-added label span { font-weight: 400; color: #6e6e73; }
+  .dm-added input, .dm-added select, .dm-added textarea {
+    display: block; width: 100%; box-sizing: border-box; margin-top: 4px; font: inherit;
+    border: 1px solid #8e8e93; border-radius: 10px; padding: 10px 12px; min-height: 46px;
+  }
+  .dm-added textarea { min-height: 140px; resize: vertical; }
+  .dm-added button {
+    margin-top: 16px; font: inherit; font-weight: 600; cursor: pointer;
+    background: #0a5bd6; color: #fff; border: 0; border-radius: 10px; padding: 11px 20px; min-height: 46px;
+  }
+  .dm-added button[disabled] { opacity: .6; cursor: progress; }
+  .dm-added .dm-hp { position: absolute !important; left: -10000px !important; width: 1px; height: 1px; overflow: hidden; }
+  .dm-added .dm-status { min-height: 1.5em; margin: 10px 0 0; font-weight: 500; }
+  .dm-added .dm-status.ok { color: #157a46; }
+  .dm-added .dm-status.warn { color: #9a5b00; }
+  .dm-added .dm-status.err { color: #b3261e; }
+  @media (prefers-color-scheme: dark) {
+    .dm-added { border-top-color: #3a3a3c; }
+    .dm-added label span { color: #8e8e93; }
+    .dm-added button { background: #4cb8ff; color: #06101f; }
+    .dm-added .dm-status.ok { color: #4cd08a; }
+    .dm-added .dm-status.warn { color: #f0b45a; }
+    .dm-added .dm-status.err { color: #ff8a80; }
+  }
+</style>`;
+
+const GITHUB = `<a href="https://github.com/grout58">github.com/grout58</a>`;
+
+function contactSection(app) {
+  const options = FEEDBACK_APPS.map(([value, label]) =>
+    `<option value="${value}"${value === app ? " selected" : ""}>${label}</option>`).join("");
+  const reach = SUPPORT_EMAIL
+    ? `<p>Email us at <a href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a>, or send a message with the form below.</p>`
+    : `<!-- SUPPORT_EMAIL not set: set SUPPORT_EMAIL in build.mjs to show an email link here. -->
+<p>Reach us on GitHub at ${GITHUB}, or send a message with the form below.</p>`;
+  return `<section class="dm-added" id="dm-contact" aria-labelledby="dm-contact-h">
+${ADDED_CSS}
+<h2 id="dm-contact-h">Contact us</h2>
+${reach}
+<form class="dm-feedback" action="/api/feedback" method="post" data-app="${app}" novalidate>
+  <label for="dm-name">Name <span>(optional)</span>
+    <input id="dm-name" name="name" type="text" autocomplete="name" maxlength="200"></label>
+  <label for="dm-email">Email address
+    <input id="dm-email" name="email" type="email" autocomplete="email" inputmode="email" required></label>
+  <label for="dm-app">App
+    <select id="dm-app" name="app">${options}</select></label>
+  <label for="dm-message">Message
+    <textarea id="dm-message" name="message" maxlength="4000" required></textarea></label>
+  <div class="dm-hp" aria-hidden="true">
+    <label for="dm-company">Company (leave blank)</label>
+    <input id="dm-company" name="company" type="text" tabindex="-1" autocomplete="off">
+  </div>
+  <button type="submit">Send</button>
+  <p class="dm-status" role="status" aria-live="polite"></p>
+</form>
+</section>
+<script src="/assets/feedback.js" defer></script>`;
+}
+
+function privacySection(support) {
+  return `<section class="dm-added" aria-labelledby="email-list">
+<style>
+  .dm-added { margin-top: 2.5rem; padding-top: .5rem; border-top: 1px solid #c7c7cc; }
+  @media (prefers-color-scheme: dark) { .dm-added { border-top-color: #3a3a3c; } }
+</style>
+<h2 id="email-list">Email list and feedback form (added October 2026)</h2>
+<p>This section covers the draftmatrix.app website only. The apps themselves still collect no data.</p>
+<p><strong>Email list.</strong> If you join the email list, we collect only your email address, which sport's page you signed up from, and when. We use it only to send the draft-season cheat sheet and DraftMatrix app news. You can unsubscribe anytime: every email will have an unsubscribe link, or you can ask us to remove you through the <a href="${support}">support page</a>.</p>
+<p><strong>Feedback form.</strong> If you send feedback, we receive the name (optional), email address and message you send, the app you pick, and your browser's user-agent string. We use them only to reply to you.</p>
+<p>Both are stored with ${esc(PROVIDER)}. We never sell or share your email address or messages.</p>
+</section>`;
+}
+
+// Inserts the section before the page's closing lines: the <footer> on the
+// older pages, the independence disclaimer on the rest.
+function inject(src, html, section) {
+  const at = [/^<footer>/m, /^ *<p class="muted">DraftMatrix is an independent/m]
+    .map((re) => html.search(re)).find((i) => i >= 0);
+  if (at === undefined) throw new Error(`no injection point in ${src}`);
+  return html.slice(0, at) + `${ADDED_START}\n${section}\n${ADDED_END}\n` + html.slice(at);
 }
 
 function header(current) {
@@ -233,11 +355,23 @@ function build() {
   rmSync(DIST, { recursive: true, force: true });
   mkdirSync(DIST, { recursive: true });
 
-  for (const [src, out] of Object.entries(LEGACY)) copyFileSync(join(ROOT, src), join(DIST, out));
+  for (const [src, page] of Object.entries(LEGACY)) {
+    const html = readFileSync(join(ROOT, src), "utf8");
+    const section = page.add === "contact" ? contactSection(page.app) : privacySection(page.support);
+    writeFileSync(join(DIST, page.out), inject(src, html, section));
+  }
+  if (!SUPPORT_EMAIL) console.warn("WARNING: SUPPORT_EMAIL not set; support pages show GitHub + the feedback form.");
 
   cpSync(join(ROOT, "assets"), join(DIST, "assets"), { recursive: true });
   copyFileSync(join(ROOT, "src", "site.css"), join(DIST, "assets", "site.css"));
   copyFileSync(join(ROOT, "src", "signup.js"), join(DIST, "assets", "signup.js"));
+  copyFileSync(join(ROOT, "src", "feedback.js"), join(DIST, "assets", "feedback.js"));
+
+  // Pages advanced mode. _routes.json limits the worker to /api/*, so static
+  // requests skip it entirely (and don't count as worker invocations).
+  copyFileSync(join(ROOT, "src", "_worker.js"), join(DIST, "_worker.js"));
+  writeFileSync(join(DIST, "_routes.json"),
+    JSON.stringify({ version: 1, include: ["/api/*"], exclude: [] }, null, 2) + "\n");
 
   for (const page of PAGES) {
     signupCount = 0;

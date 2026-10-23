@@ -4,12 +4,17 @@
     python3 scripts/check.py          # file checks only
     python3 scripts/check.py --serve  # also serve dist/ locally and fetch every page
 
-Checks: legacy pages are byte-identical to their sources, the new pages carry no
-league or ranking-publisher names in visible text, alt/aria text or meta tags
-(URL slugs like /nfl/ and form values are not visible and are allowed), every local link and image
-resolves to a file in dist/, and dist/ stays under the size budget.
+Checks:
+- each legacy page in dist/ is its source plus exactly one injected block between
+  <!-- dm-added:start --> and <!-- dm-added:end -->; with that block cut out, the
+  bytes match the source exactly. The legacy sources themselves are unmodified.
+- the new pages and the injected blocks carry no league or ranking-publisher names
+  in visible text, alt/aria text or meta tags (URL slugs like /nfl/ and form values
+  are not visible and are allowed).
+- every local link and image in the new pages and injected blocks resolves to a file in dist/.
+- dist/_worker.js passes scripts/worker-test.mjs (run in node with fake KV and ASSETS).
+- functions/ is gone, and dist/ stays under the size budget.
 """
-import filecmp
 import random
 import re
 import subprocess
@@ -32,7 +37,9 @@ LEGACY = {
     "baseball-privacy.html": "baseball-privacy.html",
 }
 NEW = ["index.html", "nfl/index.html", "nba/index.html", "nhl/index.html", "mlb/index.html"]
-REQUIRED = NEW + list(LEGACY.values()) + ["_redirects", "sitemap.xml", "robots.txt", "assets/site.css"]
+REQUIRED = NEW + list(LEGACY.values()) + ["_redirects", "_routes.json", "_worker.js", "sitemap.xml",
+                                          "robots.txt", "assets/site.css", "assets/signup.js", "assets/feedback.js"]
+ADDED = re.compile(rb"<!-- dm-added:start -->\n.*?<!-- dm-added:end -->\n", re.S)
 BRANDS = re.compile(
     r"\b(NFL|NBA|WNBA|NHL|MLB|ESPN|borischen|Boris Chen|fantasyfootballcalculator|"
     r"Fantasy Football Calculator|FantasyPros|Yahoo)\b", re.I)
@@ -46,6 +53,7 @@ def visible(html):
     attrs = [v for _, v in VISIBLE_ATTR.findall(html) if not re.match(r"(https?://|/)", v)]
     return TAG.sub(" ", SCRIPT.sub("", html)) + "\n" + "\n".join(attrs)
 LOCAL_REF = re.compile(r'(?:href|src|srcset)="(/[^"#?]*)')
+RELATIVE_REF = re.compile(r'(?:href|src)="([\w-]+\.html)')
 BUDGET = 8 * 1024 * 1024
 
 failures = []
@@ -61,24 +69,33 @@ def check_files():
         if not (DIST / name).is_file():
             fail(f"missing dist/{name}")
 
+    scanned = {page: (DIST / page).read_text() for page in NEW}
     for src, out in LEGACY.items():
-        same = filecmp.cmp(ROOT / src, DIST / out, shallow=False)
-        print(f"cmp {src} dist/{out}: {'identical' if same else 'DIFFERENT'}")
+        source, built = (ROOT / src).read_bytes(), (DIST / out).read_bytes()
+        blocks = ADDED.findall(built)
+        same = ADDED.sub(b"", built) == source
+        print(f"cmp {src} dist/{out} minus {len(blocks)} added block(s): {'identical' if same else 'DIFFERENT'}")
+        if len(blocks) != 1:
+            fail(f"{out} has {len(blocks)} added blocks, expected 1")
         if not same:
-            fail(f"{out} differs from {src}")
+            fail(f"{out} differs from {src} outside the added block")
+        scanned[f"{out} (added block)"] = b"".join(blocks).decode()
+
+    if (ROOT / "functions").exists():
+        fail("functions/ still exists")
 
     diff = subprocess.run(["git", "diff", "--stat", "--", *LEGACY], cwd=ROOT, capture_output=True, text=True)
     print(f"git diff on legacy sources: {diff.stdout.strip() or 'none'}")
     if diff.stdout.strip():
         fail("legacy sources modified")
 
-    for page in NEW:
-        text = (DIST / page).read_text()
+    for page, text in scanned.items():
         hits = sorted({m.group(0) for m in BRANDS.finditer(visible(text))})
         print(f"brand scan dist/{page}: {hits or 'clean'}")
         if hits:
             fail(f"{page} mentions {hits}")
-        for ref in LOCAL_REF.findall(text):
+        # Legacy pages all sit at the dist root, so their relative links resolve from there.
+        for ref in LOCAL_REF.findall(text) + RELATIVE_REF.findall(text):
             target = DIST / ref.lstrip("/")
             if ref.endswith("/"):
                 target = target / "index.html"
@@ -91,6 +108,15 @@ def check_files():
         fail("dist over 8 MB")
 
 
+def check_worker():
+    result = subprocess.run(["node", str(ROOT / "scripts" / "worker-test.mjs")], cwd=ROOT,
+                            capture_output=True, text=True)
+    print(result.stdout.rstrip())
+    if result.returncode != 0:
+        print(result.stderr.rstrip())
+        fail("worker tests failed")
+
+
 def check_serve():
     port = random.randint(20000, 60000)
     server = subprocess.Popen([sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1"],
@@ -99,6 +125,7 @@ def check_serve():
         time.sleep(1)
         paths = ["/", "/nfl/", "/nba/", "/nhl/", "/mlb/"] + [f"/{p}" for p in LEGACY.values()] + \
                 ["/_redirects", "/sitemap.xml", "/robots.txt", "/assets/site.css", "/assets/signup.js",
+                 "/assets/feedback.js", "/_routes.json",
                  "/assets/og/default.png", "/assets/badges/app-store-black.svg"]
         for path in paths:
             try:
@@ -116,6 +143,7 @@ def check_serve():
 
 if __name__ == "__main__":
     check_files()
+    check_worker()
     if "--serve" in sys.argv:
         check_serve()
     print("OK" if not failures else f"{len(failures)} failure(s)")

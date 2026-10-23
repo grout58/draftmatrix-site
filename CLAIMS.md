@@ -10,7 +10,7 @@ Paths are relative to `../DraftMatrix/`. Abbreviations:
 - **M-HK** = `apps/NHLDraftMatrix/AppStore/metadata.md`, 2.0.1 section, lines 186–234
 - **M-BB** = `apps/MLBDraftMatrix/AppStore/metadata.md` (pre-submission draft, no 2.0.1 section)
 
-The legacy pages (`support.html`, `privacy.html`, `hockey*.html`, `basketball*.html`, `baseball*.html`) are not covered. They are copied unchanged.
+The legacy pages' own content (`support.html`, `privacy.html`, `hockey*.html`, `basketball*.html`, `baseball*.html`) is not covered; it is copied unchanged. The sections the build adds to them are covered below under "Sections added to the legacy pages".
 
 ## Pricing and Pro (home, every sport page)
 
@@ -25,7 +25,6 @@ The legacy pages (`support.html`, `privacy.html`, `hockey*.html`, `basketball*.h
 | Free: your first three picks to your own team, three in total across all drafts | `PK/DraftMatrixUI/Support/ProAccess.swift:68` (`freePickLimit = 3`, "across every draft"), `:73`, `:204-205`; only `toggleMine` is gated: `PK/DraftMatrixUI/AppModel.swift:367-386` |
 | Free: marking other teams' picks | `toggleTaken` is not gated: `PK/DraftMatrixUI/AppModel.swift:365` |
 | Pro: unlimited picks to your own team, in every draft | "unlocks unlimited picks in every draft" in M-FB, M-HP, M-HK |
-| Earlier paid buyers get Pro at no charge | "Bought DraftMatrix before it was free? Pro is already yours" in M-FB, M-HP, M-HK; mechanism `ProAccess.swift:14-29, 255-268`; per-app cutoffs `apps/DraftBoard/DraftBoard/DraftMatrixApp.swift:40-51`, `apps/NBADraftMatrix/NBADraftMatrix/NBADraftMatrixApp.swift:36`, `apps/NHLDraftMatrix/NHLDraftMatrix/NHLDraftMatrixApp.swift:36-38` (see concerns) |
 | Restore Purchases is in the Draft panel | `PK/DraftMatrixUI/Views/DraftSidebarView.swift:401`, `PK/DraftMatrixUI/Views/PaywallView.swift:145` |
 | No account, no tracking, "Data Not Collected" | M-FB:155, M-HP:191, M-HK:232; `NSPrivacyTracking = false` in each `PrivacyInfo.xcprivacy:5-6`; App Privacy notes in each metadata.md ("Data Not Collected") |
 
@@ -124,10 +123,25 @@ Not claimed: Mac or Vision Pro. No Catalyst or "Designed for iPad" setting is in
 ## Signup copy (promises, not app facts)
 
 - "Get the free cheat sheet each draft season" is the owner's wording.
-- "We'll email you the free cheat sheet when draft season starts. Your address is used only for DraftMatrix emails." I wrote this one. It is a commitment, so the owner should confirm it before `SIGNUP_LIVE = true`.
+- "We'll email you the free cheat sheet when draft season starts." I wrote this one. It is a commitment.
+- "We only use your email for DraftMatrix emails. Privacy" under every signup form is the owner's wording. It links to `#email-list` on the matching privacy page (`/privacy.html` for home and football, then `/basketball-privacy.html`, `/hockey-privacy.html`, `/baseball-privacy.html`).
 - Baseball page: "…and a note when the app is out." Same caveat.
 
+## Sections added to the legacy pages
+
+| Claim | Backed by |
+|---|---|
+| Support pages: contact via github.com/grout58 | The link already on every legacy support page. No email address is given: none exists on the current pages, and `SUPPORT_EMAIL` stays `null` until the owner supplies one |
+| Support pages: the feedback form sends name, email, app and message | `src/feedback.js`, `src/_worker.js` (`feedback()`) |
+| Privacy: the email list collects only the address, the sport page and when | `src/_worker.js` `subscribe()` stores `{sport, sports, ts, firstTs}` under the address and nothing else. "and when" is my addition, because the timestamps are stored |
+| Privacy: used only for the cheat sheet and app news; unsubscribe link in every email; never sold or shared | Owner's commitments. Nothing sends email yet, so the email tool chosen later must add an unsubscribe link to every message |
+| Privacy: feedback stores the name (optional), email, message, app and user-agent | `src/_worker.js` `feedback()` stores `{name, email, app, message, ts, ua}`. The owner's wording named only the name, email and message. I added the app and the user-agent string because both are stored too |
+| Privacy: both stored with "Cloudflare, our website host" | KV bindings `SIGNUPS` / `FEEDBACK` on the Pages project; `PROVIDER` in `build.mjs` |
+| Privacy: "The apps themselves still collect no data" | Same sources as "No account, no tracking, Data Not Collected" above |
+
 ## Dropped or changed, and why
+
+- **"Bought DraftMatrix before it was free? Pro is already yours."** Dropped from the home pricing card and the football, hoops and hockey FAQs on 2026-10-23, on the owner's instruction, until the grandfather fix has shipped in every app (see Open concerns). It is still in the submitted App Store descriptions (M-FB, M-HP, M-HK). The code that backs it, for when it returns: `ProAccess.swift:14-29, 255-268`; per-app cutoffs `apps/DraftBoard/DraftBoard/DraftMatrixApp.swift:40-51`, `apps/NBADraftMatrix/NBADraftMatrix/NBADraftMatrixApp.swift:36`, `apps/NHLDraftMatrix/NHLDraftMatrix/NHLDraftMatrixApp.swift:36-38`. To restore it, put back the `<li>` in `src/pages/home.html` and the "I paid for … before it was free" `<dt>`/`<dd>` in `src/pages/nfl.html`, `nba.html` and `nhl.html`.
 
 - **Publisher names** (`borischen.co`, Fantasy Football Calculator, ESPN). The football description names them, but rule 3 bars ranking-publisher brands from the site, so the copy says "publicly published fantasy football data". The legacy `support.html` and `privacy.html` still name borischen.co and fantasyfootballcalculator.com, because they are copied verbatim.
 - **"Bye weeks and average draft position on every player"** (football, M-FB:137). Dropped as a feature bullet. `CLAUDE.md` (2026-10-18) records that in-season feeds are thin and many rows lack team, bye or ADP. The FAQ only says where that data comes from.
@@ -141,5 +155,5 @@ Not claimed: Mac or Vision Pro. No Catalyst or "Designed for iPad" setting is in
 
 ## Open concerns
 
-- **Grandfathering is not airtight today.** Hockey's date-based fix is in 2.0.1 build 30, which was submitted 2026-10-23 and isn't live yet. Until it is approved, some $1.99 buyers of hockey builds 24+ hit the paywall. Football's date-based cutoff may only be on the local branch `fix/nfl-grandfather-paid` (`CLAUDE.md`, 2026-10-23), so a few football buyers from the minutes it sold at $1.99 on 2.0 may not be covered. The site's line comes from the submitted listings and points people to Restore Purchases.
+- **Grandfathering is not airtight today.** Hockey's date-based fix is in 2.0.1 build 30, which was submitted 2026-10-23 and isn't live yet. Until it is approved, some $1.99 buyers of hockey builds 24+ hit the paywall. Football's date-based cutoff may only be on the local branch `fix/nfl-grandfather-paid` (`CLAUDE.md`, 2026-10-23), so a few football buyers from the minutes it sold at $1.99 on 2.0 may not be covered. The site no longer makes this claim (see Dropped). The App Store descriptions still do.
 - **Football listing name.** The live listing may still read "DraftMatrix" until 2.0.1 clears review. The site uses "DraftMatrix: Fantasy Football" as instructed.

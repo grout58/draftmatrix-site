@@ -4,20 +4,23 @@ The marketing and support site for the DraftMatrix apps, for Cloudflare Pages at
 
 ## Stack
 
-- Plain HTML and one shared stylesheet (`src/site.css`). The signup form is the only JavaScript (`src/signup.js`).
+- Plain HTML and one shared stylesheet (`src/site.css`). The only JavaScript is the signup form (`src/signup.js`) and the feedback form (`src/feedback.js`).
+- One dependency-free Pages worker (`src/_worker.js`, Pages "advanced mode") for the two form endpoints.
 - `build.mjs` is a dependency-free Node script. It wraps the page bodies in `src/pages/` with the shared head, header and footer, and writes the deployable site to `dist/`. No npm and no `package.json`.
 - No external fonts, scripts, analytics or cookies.
 
 ```
-build.mjs              build script (SIGNUP_LIVE flag at the top)
+build.mjs              build script (SIGNUP_LIVE, SUPPORT_EMAIL, PROVIDER at the top)
 src/pages/*.html       page bodies: home, nfl, nba, nhl, mlb
 src/site.css           shared styles (copied to dist/assets/site.css)
 src/signup.js          signup form handler (copied to dist/assets/signup.js)
-functions/api/subscribe.js   Cloudflare Pages Function for POST /api/subscribe
+src/feedback.js        feedback form handler (copied to dist/assets/feedback.js)
+src/_worker.js         Pages worker: POST /api/subscribe, POST /api/feedback (copied to dist/_worker.js)
 assets/                screenshots, icons, OG images, App Store badges (committed)
 scripts/screens.py     regenerates assets/screens + assets/icons from ../DraftMatrix
 scripts/og.py          regenerates assets/og/*.png (1200x630)
-scripts/check.py       checks dist/ (legacy byte-identity, brand scan, links, size)
+scripts/check.py       checks dist/ (legacy pages, brand scan, links, worker tests, size)
+scripts/worker-test.mjs  runs dist/_worker.js in node with fake KV and ASSETS
 *.html at the root     legacy support/privacy pages, never edited
 CLAIMS.md              every factual claim on the site and the source that backs it
 ```
@@ -37,10 +40,19 @@ What ends up in `dist/`:
 |---|---|
 | `/` (`index.html`) | new home page |
 | `/nfl/`, `/nba/`, `/nhl/`, `/mlb/` | new sport pages (`<slug>/index.html`) |
-| `/support.html` | the old `index.html` (football support), copied byte-for-byte |
-| `/privacy.html`, `/hockey.html`, `/hockey-privacy.html`, `/basketball.html`, `/basketball-privacy.html`, `/baseball.html`, `/baseball-privacy.html` | copied byte-for-byte |
-| `/_redirects`, `/sitemap.xml`, `/robots.txt` | generated |
+| `/support.html` | the old `index.html` (football support) plus an added Contact us section |
+| `/hockey.html`, `/basketball.html`, `/baseball.html` | copied, plus an added Contact us section |
+| `/privacy.html`, `/hockey-privacy.html`, `/basketball-privacy.html`, `/baseball-privacy.html` | copied, plus an added email-list section |
+| `/_redirects`, `/_routes.json`, `/sitemap.xml`, `/robots.txt` | generated |
+| `/_worker.js` | `src/_worker.js` |
 | `/assets/` | `assets/` plus the CSS and JS |
+
+### Sections added to the legacy pages
+
+The sources at the repo root are never edited. The build copies each one and inserts one block, between `<!-- dm-added:start -->` and `<!-- dm-added:end -->`, just before the page's closing lines (the `<footer>` on `support.html` and `privacy.html`, the independence disclaimer on the others). Each block has its own small `<style>` scoped to `.dm-added`, so the rest of the page looks exactly as before. `scripts/check.py` cuts the block out and checks that what's left is byte-identical to the source.
+
+- **Support pages: "Contact us"** with a feedback form (name optional, email, app preselected for the page, message up to 4,000 characters, honeypot) that posts to `/api/feedback`. There is no support email address yet. While `SUPPORT_EMAIL` in `build.mjs` is `null`, the section links to github.com/grout58 and the form, carries an HTML comment `SUPPORT_EMAIL not set`, and the build prints a warning. Set it to an address to show a `mailto:` link instead.
+- **Privacy pages: "Email list and feedback form (added October 2026)"**, anchor `#email-list`. It names where the data is stored from `PROVIDER` in `build.mjs` (now "Cloudflare, our website host"); change that when an email provider is chosen.
 
 The legacy pages link to each other relatively (`privacy.html`, `hockey.html`), and those links still resolve because every legacy file sits at the root.
 
@@ -53,12 +65,26 @@ python3 scripts/og.py        # Open Graph images
 
 ## Deploy
 
-Run from the **repo root**, not from `dist/`. Pages looks for `functions/` in the current working directory, and `dist` is the output directory:
+`dist/` is the complete deployable site, including `dist/_worker.js`. There is no `functions/` directory: the site uses Pages "advanced mode", which works with Direct Upload because the worker is a single dependency-free ES module that needs no compiling.
 
 ```sh
 node build.mjs
+# then upload dist/ with the Direct Upload API, or:
 npx wrangler pages deploy dist --project-name draftmatrix-site --branch site-v2
 ```
+
+### How the worker and static files fit together
+
+- `dist/_routes.json` (`{"include": ["/api/*"]}`) tells Pages to run the worker only for `/api/*`. Every other request is served as a static asset without touching the worker, so it doesn't count as a worker invocation.
+- If the worker does run for a non-API path, it hands the request to `env.ASSETS.fetch(request)` unchanged.
+- Static asset serving, which is what `env.ASSETS` is, applies `_redirects` and pretty URLs (`/support.html` → `/support`). Requests the worker answers itself (`/api/*`) don't go through `_redirects` or `_headers`, and none of the rules touch `/api/`.
+- I couldn't open Cloudflare's docs from here, so this comes from memory, not a fresh read. After the first preview deploy, confirm it:
+
+  ```sh
+  curl -sI https://<preview>.pages.dev/draftmatrix-site/hockey.html   # 301 -> /hockey.html
+  curl -sI https://<preview>.pages.dev/support.html                   # 308 -> /support
+  curl -s  https://<preview>.pages.dev/api/subscribe                  # 405 JSON
+  ```
 
 ## Redirects
 
@@ -75,28 +101,37 @@ The old GitHub Pages root was the football support page, so it goes to `/support
 
 There is deliberately **no** `/support -> /support.html` rule. Pages "pretty URLs" already serve `support.html` at `/support` and redirect `/support.html` to `/support`. A rule sending `/support` back to `/support.html` would loop. For the same reason the redirect targets are the bare paths (`/support`, not `/support.html`), which saves a hop. Only requests that reach Cloudflare use these rules. Old `grout58.github.io/draftmatrix-site/...` links keep going to GitHub Pages until that site is changed.
 
-## Email signup (not live yet)
+## Forms and the worker
 
-Every page has a form that posts JSON `{email, sport, company}` to `/api/subscribe`. `company` is a hidden honeypot field, and `sport` is one of `all`, `nfl`, `nba`, `nhl`, `mlb`.
+`src/_worker.js` (deployed as `dist/_worker.js`) handles two endpoints. Both take JSON (or form-encoded) bodies and answer JSON with `cache-control: no-store`.
 
-`functions/api/subscribe.js`:
+| Request | Response |
+|---|---|
+| Anything but POST on `/api/*` | 405, `Allow: POST` |
+| POST to an unknown `/api/*` path | 404 |
+| `Origin` header present and not this host | 403 |
+| Binding missing (`SIGNUPS` for subscribe, `FEEDBACK` for feedback) | 503 `{ok:false, reason:"not live"}` |
+| Bad JSON, or body too large | 400 |
+| Honeypot `company` filled in | 200 `{ok:true}`, nothing stored |
+| Invalid input | 400 |
+| KV error | 500 |
+| Stored | 200 `{ok:true}` |
 
-- **No KV binding named `SIGNUPS`:** returns `503 {ok:false, reason:"signup not live"}`. The form then shows "Signups open soon — this form isn't live yet."
-- **With the binding:** validates the email and stores key `email:<lowercased email>` with value `{"sport": "...", "ts": "<ISO time>"}`, then returns `200 {ok:true}`. A bad email gets 400.
-- **Honeypot filled in:** returns 200 and stores nothing.
+**`POST /api/subscribe`** `{email, sport, company}`, where `sport` is `all`, `nfl`, `nba`, `nhl` or `mlb` (anything else becomes `all`). Stored in KV `SIGNUPS` under `email:<lowercased email>` as `{sport, sports, ts, firstTs}`: `sport` and `ts` are the latest signup, `sports` collects every sport page the address signed up from (no duplicates), and `firstTs` is the first signup. Signing up again merges into this record instead of overwriting it. Records in the older `{sport, ts}` shape are upgraded on the next signup.
 
-The form only reports success on a 200 with `ok: true`.
+**`POST /api/feedback`** `{name, email, app, message, company}`. Email and message are required, the message can be up to 4,000 characters, and the name up to 200. `app` is `football`, `hoops`, `hockey`, `baseball` or `other`. Stored in KV `FEEDBACK` under `fb:<ISO time>:<8 random hex>` as `{name, email, app, message, ts, ua}`, where `ua` is the request's User-Agent cut to 300 characters.
 
-To go live:
+The forms only report success on 200 with `ok: true`. On 503 the signup form says "Signups open soon — this form isn't live yet." and the feedback form says "The form isn't live yet — please use the contact link above." Anything else gets a generic try-again message; the feedback one points to the contact link.
 
-1. Create a KV namespace, for example `wrangler kv namespace create draftmatrix-signups`.
-2. In the Pages project, go to **Settings → Bindings** and add a KV namespace binding named `SIGNUPS` for Production (and Preview if wanted).
-3. In `build.mjs`, set `SIGNUP_LIVE = true`. This removes the "Preview: signups aren't live yet." note under each form.
-4. Rebuild and deploy.
+Setup:
 
-Each address keeps one record, so signing up again (say, from a different sport page) overwrites the earlier `sport`.
+1. Create two KV namespaces, for example `wrangler kv namespace create draftmatrix-signups` and `wrangler kv namespace create draftmatrix-feedback`.
+2. In the Pages project, under **Settings → Bindings**, add KV bindings `SIGNUPS` and `FEEDBACK` for Preview and Production.
+3. `SIGNUP_LIVE` in `build.mjs` is `true`, so the forms carry no "Preview" note. Set it back to `false` to show "Preview: signups aren't live yet." again. Without a binding the endpoints still answer 503, whatever the flag says.
 
-Locally, `python3 -m http.server` can't run the function, so the form shows its generic error there. `npx wrangler pages dev dist` runs the function.
+Feedback isn't emailed anywhere yet. Read it in the dashboard (KV → `FEEDBACK`) or with `wrangler kv key list --namespace-id <id> --prefix fb:`.
+
+Locally, `python3 -m http.server` can't run the worker, so the forms show their generic error there. `npx wrangler pages dev dist` runs it. `node scripts/worker-test.mjs` tests it against fake bindings.
 
 ## Rules for copy
 
