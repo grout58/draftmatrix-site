@@ -30,6 +30,9 @@ Checks:
 - dist/_worker.js passes scripts/worker-test.mjs (run in node with fake KV and ASSETS).
 - dist/_redirects keeps the /draftmatrix-site rules and has a 301 from /x/ to /x
   for every flat legacy page (and there's no dist/x/index.html to loop with).
+- dist/404.html exists (so Pages answers unknown paths with 404, not index.html),
+  has <meta name="robots" content="noindex"> and no canonical/og:url, and is not in
+  sitemap.xml or linked from any page.
 - functions/ is gone, and dist/ stays under the size budget.
 """
 import random
@@ -53,7 +56,7 @@ LEGACY = {
     "baseball.html": "baseball.html",
     "baseball-privacy.html": "baseball-privacy.html",
 }
-NEW = ["index.html", "nfl/index.html", "nba/index.html", "nhl/index.html", "mlb/index.html"]
+NEW = ["index.html", "nfl/index.html", "nba/index.html", "nhl/index.html", "mlb/index.html", "404.html"]
 REQUIRED = NEW + list(LEGACY.values()) + ["_redirects", "_routes.json", "_worker.js", "sitemap.xml",
                                           "robots.txt", "assets/site.css", "assets/signup.js", "assets/feedback.js"]
 ADDED = re.compile(rb"<!-- dm-added:start -->\n.*?<!-- dm-added:end -->\n", re.S)
@@ -180,6 +183,8 @@ def check_files():
             target = DIST / ref.lstrip("/")
             if ref.endswith("/"):
                 target = target / "index.html"
+            elif not target.exists() and target.suffix == "":
+                target = target.with_name(target.name + ".html")  # Pages serves /x from x.html
             if not target.exists():
                 fail(f"{page} links to missing {ref}")
 
@@ -247,6 +252,22 @@ def check_files():
                 fail(f"{out} privacy block is missing {needed!r}")
         if re.search(r"user.agent|IP address", block, re.I):
             fail(f"{out} privacy block mentions data that isn't stored")
+
+    # 404.html: Pages only serves real 404s when it exists. Not indexed, not in the sitemap.
+    not_found = DIST / "404.html"
+    if not_found.is_file():
+        html = not_found.read_text()
+        noindex = '<meta name="robots" content="noindex">' in html
+        print(f"404.html: noindex {'yes' if noindex else 'NO'}")
+        if not noindex:
+            fail("404.html lacks <meta name=\"robots\" content=\"noindex\">")
+        if 'rel="canonical"' in html or 'property="og:url"' in html:
+            fail("404.html has a canonical link or og:url")
+        if re.search(r"/404(\.html)?\b", (DIST / "sitemap.xml").read_text()):
+            fail("404 page is in sitemap.xml")
+        for page, other in pages.items():
+            if re.search(r'href="/404(\.html)?"', other):
+                fail(f"{page} links to the 404 page")
 
     size = sum(f.stat().st_size for f in DIST.rglob("*") if f.is_file())
     print(f"dist size: {size / 1024 / 1024:.2f} MB")

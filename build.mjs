@@ -153,6 +153,22 @@ const PAGES = [
   },
 ];
 
+// Pages serves dist/404.html, with status 404, for any path it has no file for.
+// Without it, Pages treats the site as a single-page app and answers every
+// unknown path with index.html and 200. Not in PAGES, so it stays out of the
+// sitemap; noindex, with no canonical or og:url since it's served at any path.
+const NOT_FOUND = {
+  src: "404.html",
+  out: "404.html",
+  noindex: true,
+  title: "Page not found — DraftMatrix",
+  description: "This page doesn't exist on draftmatrix.app.",
+  og: "default",
+  ogAlt: "DraftMatrix",
+  theme: "brand",
+  icon: "nfl",
+};
+
 // Legacy pages listed in the sitemap, at the URLs Pages serves them on
 // (Pages drops .html and redirects to the bare path).
 const SITEMAP_LEGACY = [
@@ -405,7 +421,7 @@ function layout(page, body) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(page.title)}</title>
 <meta name="description" content="${esc(page.description)}">
-<link rel="canonical" href="${url}">
+${page.noindex ? `<meta name="robots" content="noindex">` : `<link rel="canonical" href="${url}">`}
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="${THEME_COLOR[page.theme]}">
 ${iconLinks(page.icon)}
@@ -414,8 +430,7 @@ ${iconLinks(page.icon)}
 <meta property="og:site_name" content="DraftMatrix">
 <meta property="og:title" content="${esc(page.title)}">
 <meta property="og:description" content="${esc(page.description)}">
-<meta property="og:url" content="${url}">
-<meta property="og:image" content="${og}">
+${page.noindex ? "" : `<meta property="og:url" content="${url}">\n`}<meta property="og:image" content="${og}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="${esc(page.ogAlt ?? `${page.title.split(" — ")[0]} screenshots`)}">
@@ -475,7 +490,7 @@ function build() {
   writeFileSync(join(DIST, "_routes.json"),
     JSON.stringify({ version: 1, include: ["/api/*"], exclude: [] }, null, 2) + "\n");
 
-  for (const page of PAGES) {
+  for (const page of [...PAGES, NOT_FOUND]) {
     signupCount = 0;
     const body = expand(readFileSync(join(ROOT, "src", "pages", page.src), "utf8"));
     const html = layout(page, body);
@@ -510,7 +525,7 @@ function build() {
 
   writeFileSync(join(DIST, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${ORIGIN}/sitemap.xml\n`);
 
-  console.log(`Built ${PAGES.length} pages + ${Object.keys(LEGACY).length} legacy files into dist/ (SIGNUP_LIVE=${SIGNUP_LIVE})`);
+  console.log(`Built ${PAGES.length} pages + 404.html + ${Object.keys(LEGACY).length} legacy files into dist/ (SIGNUP_LIVE=${SIGNUP_LIVE})`);
 }
 
 build();

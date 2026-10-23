@@ -3,16 +3,19 @@
 
     python3 scripts/verify-deploy.py [dist] [base-url]   # defaults: dist https://draftmatrix.app
 
-Builds nothing. For every file in dist/ except _worker.js, _routes.json and
-_redirects, works out the URL Pages serves it at (x/index.html -> /x/,
+Builds nothing. For every file in dist/ except _worker.js, _routes.json,
+_redirects and 404.html, works out the URL Pages serves it at (x/index.html -> /x/,
 foo.html -> /foo, index.html -> /), fetches it (following at most one redirect)
 and compares the SHA-256 of the bytes. Also checks that /_redirects and
-/_routes.json are 404 and that the rules in dist/_redirects answer with their
+/_routes.json are 404, that a random missing path (/__verify-missing-<hex>) is
+404 with dist/404.html as its body (404.html has no URL of its own, so it isn't
+fetched directly), and that the rules in dist/_redirects answer with their
 codes and targets; for exact (non-splat) rules, such as /support/ -> /support,
 the target must then answer 200 itself. Prints a table and exits 1 on any failure. Stdlib only.
 """
 
 import hashlib
+import secrets
 import sys
 import urllib.error
 import urllib.parse
@@ -20,7 +23,9 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-SKIP = {"_worker.js", "_routes.json", "_redirects"}
+# 404.html is skipped here because Pages has no fixed URL for it; check_missing
+# fetches a random missing path instead and compares the body against it.
+SKIP = {"_worker.js", "_routes.json", "_redirects", "404.html"}
 UA = "draftmatrix-verify-deploy/1"
 
 
@@ -82,6 +87,19 @@ def check_hidden(base, path):
     return (path, base + path, str(status), label(status, ok, "ok (404)", "SERVED (want 404)"), ok)
 
 
+def check_missing(base, dist):
+    """A random path that can't exist must answer 404 (not index.html with 200), with dist/404.html as the body."""
+    path = f"/__verify-missing-{secrets.token_hex(8)}"
+    status, _, body = fetch(base + path)
+    ok = status == 404
+    shown = str(status)
+    page = dist / "404.html"
+    if ok and page.exists():
+        ok = hashlib.sha256(body).hexdigest() == hashlib.sha256(page.read_bytes()).hexdigest()
+        shown += " (404.html)" if ok else " (body is not 404.html)"
+    return (path, base + path, shown, label(status, ok, "ok (404)", "WANT 404 with 404.html"), ok)
+
+
 def redirect_cases(dist):
     """(request path, expected code, expected target path) per _redirects rule."""
     f = dist / "_redirects"
@@ -134,6 +152,7 @@ def main():
     with ThreadPoolExecutor(max_workers=8) as pool:
         rows = list(pool.map(lambda rel: check_file(base, dist, rel), files))
         rows += list(pool.map(lambda p: check_hidden(base, p), ["/_redirects", "/_routes.json"]))
+        rows.append(check_missing(base, dist))
         rows += list(pool.map(lambda c: check_redirect(base, *c), redirect_cases(dist)))
 
     widths = [max(len(r[i]) for r in rows + [("path", "url", "status", "match")]) for i in range(3)]
