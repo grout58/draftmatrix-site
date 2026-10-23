@@ -60,3 +60,5 @@ python3 scripts/verify-deploy.py dist https://draftmatrix.app   # both arguments
 ```
 
 It fetches every file in `dist/` (except `_worker.js`, `_routes.json`, `_redirects`) at the URL Pages serves it at, compares SHA-256 hashes, checks `/_redirects` and `/_routes.json` are 404 and that each `_redirects` rule answers with its code and target, prints a table, and exits 1 on any failure. Build from the same commit that was deployed, or the hashes won't match. Point it at a preview URL (`https://<hash>.draftmatrix-site.pages.dev`) to check a deployment before it's on the domain.
+
+> **Status (2026-10-23):** the repo secrets are set, so production deploys now come from GitHub Actions on every push to `main`.
