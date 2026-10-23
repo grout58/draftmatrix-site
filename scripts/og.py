@@ -77,7 +77,7 @@ CARDS = {
         "bg": "brand",
         "icons": [],  # no released baseball icon: the brand motif instead
         "title": "Fantasy Baseball",
-        "lines": ["Coming February 2027", "A tiered baseball draft board"],
+        "lines": ["Coming January 2027", "A tiered baseball draft board"],
         "foot": "DraftMatrix · iPhone and iPad",
         "shots": [
             "MLBDraftMatrix/AppStore/2.0/iphone-6.9in-1-board-draft-in-progress.png",

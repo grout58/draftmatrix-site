@@ -98,7 +98,7 @@ Not claimed: Mac or Vision Pro. No Catalyst or "Designed for iPad" setting is in
 
 | Claim | Backed by |
 |---|---|
-| Coming February 2027 | Owner's instruction. `CLAUDE.md` and `Notes/freemium-plan.md:31` say "~January" for 2027 ranks and launch; the site uses the owner's date |
+| Coming January 2027 | Owner's instruction. Now matches `CLAUDE.md` and `Notes/freemium-plan.md:31`, which say "~January" for 2027 ranks and launch |
 | Not on the App Store yet | No App Store Connect record (`apps/MLBDraftMatrix/AppStore/metadata.md:136-142`) |
 | Built and waiting on next season's rankings | `CLAUDE.md` app table ("Waits on 2027 ranks (~January) and the ASC record") |
 | Roto or Points | `PK/DraftMatrixMLB/MLBSport.swift:24-33`; M-BB "ROTO OR POINTS" |

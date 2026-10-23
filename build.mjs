@@ -143,9 +143,9 @@ const PAGES = [
     out: "mlb/index.html",
     path: "/mlb/",
     nav: "mlb",
-    title: "DraftMatrix: Fantasy Baseball — coming February 2027",
+    title: "DraftMatrix: Fantasy Baseball — coming January 2027",
     description:
-      "DraftMatrix: Fantasy Baseball is coming in February 2027: a tiered fantasy baseball draft board for iPhone and iPad. Get the free cheat sheet each draft season.",
+      "DraftMatrix: Fantasy Baseball is coming in January 2027: a tiered fantasy baseball draft board for iPhone and iPad. Get the free cheat sheet each draft season.",
     og: "mlb",
     theme: "brand",
     icon: "motif", // baseball has no released app icon; the tile motif (scripts/motif_icon.py)
