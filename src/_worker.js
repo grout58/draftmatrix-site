@@ -16,6 +16,16 @@
 //   TURNSTILE_SECRET  Turnstile secret key (Pages project secret)
 // A missing binding or secret makes the endpoint answer 503 {ok:false, reason:"not live"}.
 //
+// Optional Buttondown forwarding (off unless both of the first two are set; see DEPLOY.md):
+//   BUTTONDOWN_API_KEY  Buttondown API key (encrypted Pages secret)
+//   BUTTONDOWN_ENABLED  plain env var; must be exactly "true"
+//   BUTTONDOWN_TAGS     plain env var; "true" adds a "<sport>-launch" tag (paid Buttondown plan only)
+// After a signup is stored in KV, it is also sent to Buttondown in the background
+// (ctx.waitUntil). KV stays the record of truth: the response is the same 200
+// {ok:true} whatever Buttondown answers, and the forward is skipped without ctx.
+// No "type" is sent, so Buttondown emails a confirmation link (double opt-in).
+// Logs only "buttondown <status>", "buttondown error" or "buttondown timeout".
+//
 // Everything outside /api/ is passed to env.ASSETS.fetch(request) unchanged, so
 // static files, pretty URLs and _redirects behave as they do without a worker.
 
@@ -28,6 +38,8 @@ const MAX_NAME = 200;
 const MAX_BODY = { subscribe: 6144, feedback: 36864 };
 const MAX_TOKEN = 2048;
 const SITEVERIFY = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+const BUTTONDOWN = "https://api.buttondown.com/v1/subscribers";
+const BUTTONDOWN_TIMEOUT = 8000;
 
 function json(status, body, headers = {}) {
   return new Response(JSON.stringify(body), {
@@ -73,7 +85,41 @@ function sameOrigin(request) {
   }
 }
 
-async function subscribe(data, env) {
+const buttondownOn = (env) =>
+  typeof env.BUTTONDOWN_API_KEY === "string" && env.BUTTONDOWN_API_KEY !== "" && env.BUTTONDOWN_ENABLED === "true";
+
+// Never throws. Without "type", Buttondown creates the subscriber unactivated and
+// emails a confirmation link. The collision header merges into an existing
+// subscriber instead of failing with 400. Tags need a paid plan (a new tag is a
+// 403 on the free plan), so a tagged request that gets 403 is retried once without.
+async function forwardToButtondown(env, email, sport, sports, ip) {
+  const body = { email_address: email, metadata: { source: "draftmatrix.app", sports: sports.join(",") } };
+  if (ip) body.ip_address = ip;
+  const send = async (payload) => {
+    const res = await fetch(BUTTONDOWN, {
+      method: "POST",
+      headers: {
+        authorization: `Token ${env.BUTTONDOWN_API_KEY}`,
+        "content-type": "application/json",
+        "x-buttondown-collision-behavior": "add",
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(BUTTONDOWN_TIMEOUT),
+    });
+    console.log("buttondown", res.status);
+    return res.status;
+  };
+  try {
+    if (env.BUTTONDOWN_TAGS === "true") {
+      if ((await send({ ...body, tags: [`${sport}-launch`] })) !== 403) return;
+    }
+    await send(body);
+  } catch (err) {
+    console.log("buttondown", err?.name === "TimeoutError" ? "timeout" : "error");
+  }
+}
+
+async function subscribe(data, env, request, ctx) {
   const email = validEmail(data.email);
   if (!email) return json(400, { ok: false, reason: "invalid email" });
   const sport = SPORTS.has(data.sport) ? data.sport : "all";
@@ -93,6 +139,13 @@ async function subscribe(data, env) {
   if (!sports.includes(sport)) sports.push(sport);
 
   await env.SIGNUPS.put(key, JSON.stringify({ sport, sports, ts, firstTs: prev?.firstTs || prev?.ts || ts }));
+  if (buttondownOn(env) && typeof ctx?.waitUntil === "function") {
+    try {
+      ctx.waitUntil(forwardToButtondown(env, email, sport, sports, request.headers.get("cf-connecting-ip")));
+    } catch {
+      // The signup is stored; a failed forward must not change the response.
+    }
+  }
   return json(200, { ok: true });
 }
 
@@ -130,7 +183,7 @@ const ROUTES = {
   "/api/feedback": { binding: "FEEDBACK", limit: MAX_BODY.feedback, handle: feedback },
 };
 
-async function api(request, env, path) {
+async function api(request, env, path, ctx) {
   if (request.method !== "POST") {
     return json(405, { ok: false, reason: "method not allowed" }, { allow: "POST" });
   }
@@ -152,16 +205,16 @@ async function api(request, env, path) {
   }
 
   try {
-    return await route.handle(data, env);
+    return await route.handle(data, env, request, ctx);
   } catch {
     return json(500, { ok: false, reason: "storage error" });
   }
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const path = new URL(request.url).pathname;
-    if (path === "/api" || path.startsWith("/api/")) return api(request, env, path);
+    if (path === "/api" || path.startsWith("/api/")) return api(request, env, path, ctx);
     return env.ASSETS.fetch(request);
   },
 };

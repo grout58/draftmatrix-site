@@ -31,6 +31,12 @@ Checks:
   carries the sitekey, and it is the only third-party script.
 - there is no baseball app icon (no assets/icons/mlb-*, no reference to one).
 - the privacy blocks don't mention data the worker no longer stores (user-agent).
+- Buttondown: while BUTTONDOWN_LIVE is false in build.mjs, no file in dist/ but
+  _worker.js mentions Buttondown; while true, the privacy blocks name it. Either way,
+  a second build with Buttondown on (DM_DIST=<temp dir> DM_BUTTONDOWN_LIVE=1, never
+  dist/) must have the Buttondown sentence and privacy link on all 4 privacy pages and
+  the confirm-by-email success message, and differ from dist/ only there.
+- scripts/buttondown-import.mjs uses the same SPORTS and EMAIL as the worker.
 - dist/_worker.js passes scripts/worker-test.mjs (run in node with fake KV and ASSETS).
 - dist/_redirects keeps the /draftmatrix-site rules and has a 301 from /x/ to /x
   for every flat legacy page (and there's no dist/x/index.html to loop with).
@@ -39,9 +45,12 @@ Checks:
   sitemap.xml or linked from any page.
 - functions/ is gone, and dist/ stays under the size budget.
 """
+import os
 import random
 import re
+import shutil
 import subprocess
+import tempfile
 import sys
 import time
 import urllib.request
@@ -107,6 +116,16 @@ SCRIPT_SRC = re.compile(r'<script\b[^>]*\bsrc="([^"]+)"')
 TURNSTILE_SCRIPT = "https://challenges.cloudflare.com/turnstile/v0/api.js"
 SITEKEY = re.search(r'TURNSTILE_SITEKEY = "([^"]+)"', (ROOT / "build.mjs").read_text()).group(1)
 BUDGET = 8 * 1024 * 1024
+BUTTONDOWN_LIVE = re.search(r"^const BUTTONDOWN_LIVE = (true|false);", (ROOT / "build.mjs").read_text(), re.M).group(1) == "true"
+# Must appear in every privacy block when Buttondown is on (build.mjs BUTTONDOWN_EMAIL_LIST).
+BD_IP = "Buttondown also receives your IP address to filter spam"
+BD_PRIVACY = [
+    "Your email address and sport(s) are stored with Cloudflare, our website host, and sent to Buttondown, our email provider",
+    "asks you to confirm your subscription by email", "handles unsubscribes (every email has an unsubscribe link)",
+    BD_IP, '<a href="https://buttondown.com/legal/privacy">Buttondown\'s privacy policy</a>',
+]
+BD_OK = "Thanks. You're on the list for the cheat sheet."
+BD_CONFIRM = "Thanks. Check your inbox and confirm your email to get on the list for the cheat sheet."
 
 failures = []
 
@@ -263,8 +282,19 @@ def check_files():
                        "https://www.cloudflare.com/privacypolicy/"]:
             if needed not in block:
                 fail(f"{out} privacy block is missing {needed!r}")
-        if re.search(r"user.agent|IP address", block, re.I):
+        # The IP address goes to Buttondown (only when that's on), not into KV.
+        if re.search(r"user.agent|IP address", block.replace(BD_IP, ""), re.I):
             fail(f"{out} privacy block mentions data that isn't stored")
+
+    # Buttondown: named on the site only when BUTTONDOWN_LIVE is true in build.mjs.
+    for f in sorted(DIST.rglob("*")):
+        if f.is_file() and f.name != "_worker.js" and f.suffix in {".html", ".js", ".txt", ".xml", ".json", ".css"}:
+            text = f.read_text(errors="replace")
+            if not BUTTONDOWN_LIVE and "buttondown" in text.lower():
+                fail(f"dist/{f.relative_to(DIST)} mentions Buttondown but BUTTONDOWN_LIVE is false")
+    print(f"buttondown: BUTTONDOWN_LIVE={BUTTONDOWN_LIVE}")
+    if BUTTONDOWN_LIVE:
+        check_buttondown_copy(DIST, "dist")
 
     # Smart App Banner: exactly the expected tag, once, in <head> on the app pages; none anywhere else.
     for f in sorted(DIST.rglob("*.html")):
@@ -302,6 +332,70 @@ def check_files():
         fail("dist over 8 MB")
 
 
+def check_buttondown_copy(root, label):
+    """The Buttondown privacy copy and the confirm-by-email success message, in the built site at root."""
+    for out in [o for o in LEGACY.values() if "privacy" in o]:
+        block = b"".join(ADDED.findall((root / out).read_bytes())).decode()
+        missing = [s for s in BD_PRIVACY if s not in block]
+        print(f"buttondown copy {label}/{out}: {'yes' if not missing else 'MISSING'}")
+        if missing:
+            fail(f"{label}/{out}: Buttondown privacy copy is missing {missing}")
+        if "We never sell or share them." in block:
+            fail(f"{label}/{out}: still says the email list is never shared")
+    js = (root / "assets" / "signup.js").read_text()
+    if BD_CONFIRM not in js or BD_OK in js:
+        fail(f"{label}/assets/signup.js: success message doesn't ask to confirm by email")
+
+
+def check_buttondown_build():
+    """Builds with Buttondown on into a temp dir (DM_DIST + DM_BUTTONDOWN_LIVE=1, never dist/),
+    checks the copy, and that only the privacy blocks and signup.js differ from dist/."""
+    tmp = Path(tempfile.mkdtemp(prefix="dm-buttondown-"))
+    try:
+        env = {**os.environ, "DM_DIST": str(tmp), "DM_BUTTONDOWN_LIVE": "1"}
+        result = subprocess.run(["node", str(ROOT / "build.mjs")], cwd=ROOT, env=env, capture_output=True, text=True)
+        print(result.stdout.rstrip())
+        if result.returncode != 0:
+            print(result.stderr.rstrip())
+            fail("build with DM_BUTTONDOWN_LIVE=1 failed")
+            return
+        check_buttondown_copy(tmp, "buttondown-build")
+        ours = {f.relative_to(DIST) for f in DIST.rglob("*") if f.is_file()}
+        theirs = {f.relative_to(tmp) for f in tmp.rglob("*") if f.is_file()}
+        if ours != theirs:
+            fail(f"buttondown build has different files: {sorted(map(str, ours ^ theirs))}")
+        changed = []
+        for rel in sorted(ours & theirs):
+            a, b = (DIST / rel).read_bytes(), (tmp / rel).read_bytes()
+            if a == b:
+                continue
+            changed.append(str(rel))
+            if BUTTONDOWN_LIVE:
+                fail(f"buttondown build differs from dist/ in {rel}, with BUTTONDOWN_LIVE already true")
+            elif rel.as_posix() == "assets/signup.js":
+                if b.replace(BD_CONFIRM.encode(), BD_OK.encode()) != a:
+                    fail("buttondown build changes more of signup.js than the success message")
+            elif "privacy" in rel.name and rel.name in LEGACY.values():
+                if ADDED.sub(b"", a) != ADDED.sub(b"", b):
+                    fail(f"buttondown build changes {rel} outside the added block")
+            else:
+                fail(f"buttondown build changes {rel}")
+        print(f"buttondown build vs dist/: changed {changed or 'nothing'}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def check_import_script():
+    """scripts/buttondown-import.mjs validates emails and sports exactly like the worker."""
+    worker, script = (ROOT / "src" / "_worker.js").read_text(), (ROOT / "scripts" / "buttondown-import.mjs").read_text()
+    for name in ["SPORTS", "EMAIL"]:
+        line = re.compile(rf"^const {name} = .*$", re.M)
+        a, b = line.findall(worker), line.findall(script)
+        if len(a) != 1 or a != b:
+            fail(f"buttondown-import.mjs {name} differs from src/_worker.js")
+    print("buttondown-import.mjs: SPORTS and EMAIL match the worker")
+
+
 def check_worker():
     result = subprocess.run(["node", str(ROOT / "scripts" / "worker-test.mjs")], cwd=ROOT,
                             capture_output=True, text=True)
@@ -337,6 +431,8 @@ def check_serve():
 
 if __name__ == "__main__":
     check_files()
+    check_buttondown_build()
+    check_import_script()
     check_worker()
     if "--serve" in sys.argv:
         check_serve()
