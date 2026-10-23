@@ -9,7 +9,8 @@ Checks:
   <!-- dm-added:start --> and <!-- dm-added:end -->; with that block cut out, the
   bytes match the source exactly, after also cutting out the one-line edits
   between <!-- dm-inline:start --> and <!-- dm-inline:end -->: the motif favicon
-  links in the two baseball pages' <head>, and on each privacy page the new
+  links in the two baseball pages' <head>, the Smart App Banner meta after the
+  viewport meta on the football, hoops and hockey support pages, and on each privacy page the new
   Contact sentence (email + support page), compared against the source with its
   old GitHub Contact sentence cut out. Nothing else may differ. The legacy
   sources themselves are unmodified.
@@ -19,6 +20,9 @@ Checks:
   pages (privacy: in the Contact line and in the deletion sentence), and no
   "SUPPORT_EMAIL" placeholder text or comment is left anywhere in dist/.
 - /mlb/ and the two baseball legacy pages use the motif favicon (assets/icons/motif*).
+- <meta name="apple-itunes-app"> appears exactly once, in <head>, with the right app id
+  on the home, /nfl/, /nba/, /nhl/ and the football, hoops and hockey support pages,
+  and on no other HTML file (not baseball, privacy or 404).
 - the new pages and the injected blocks carry no league or ranking-publisher names
   in visible text, alt/aria text or meta tags (URL slugs like /nfl/ and form values
   are not visible and are allowed).
@@ -63,10 +67,16 @@ ADDED = re.compile(rb"<!-- dm-added:start -->\n.*?<!-- dm-added:end -->\n", re.S
 INLINE = re.compile(rb"<!-- dm-inline:start -->[^\n]*?<!-- dm-inline:end -->")
 # Expected dm-inline additions per legacy page in dist/, in page order.
 INLINE_EXPECTED = {
-    "support.html": [], "hockey.html": [], "basketball.html": [],
+    "support.html": ["banner"], "hockey.html": ["banner"], "basketball.html": ["banner"],
     "baseball.html": ["favicon"],
     "privacy.html": ["email"], "hockey-privacy.html": ["email"], "basketball-privacy.html": ["email"],
     "baseball-privacy.html": ["favicon", "email"],
+}
+# Smart App Banner app id per page; every other HTML file in dist/ must have none.
+BANNER = {
+    "index.html": "6806661645", "nfl/index.html": "6806661645", "support.html": "6806661645",
+    "nba/index.html": "6814882709", "basketball.html": "6814882709",
+    "nhl/index.html": "6811083062", "hockey.html": "6811083062",
 }
 SUPPORT_EMAIL = "support@draftmatrix.app"
 MAILTO = f'<a href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a>'
@@ -129,12 +139,15 @@ def check_files():
             fail(f"{out} has {len(blocks)} added blocks, expected 1")
         if not same:
             fail(f"{out} differs from {src} outside the added blocks")
-        kinds = ["favicon" if b"motif" in m.group(0) else "email" if SUPPORT_EMAIL.encode() in m.group(0) else "?"
-                 for m in inline]
+        kinds = ["banner" if b"apple-itunes-app" in m.group(0) else "favicon" if b"motif" in m.group(0)
+                 else "email" if SUPPORT_EMAIL.encode() in m.group(0) else "?" for m in inline]
         if kinds != INLINE_EXPECTED[out]:
             fail(f"{out} inline additions {kinds}, expected {INLINE_EXPECTED[out]}")
         for m in inline:
-            if b"motif" in m.group(0):
+            if b"apple-itunes-app" in m.group(0):
+                if not re.search(rb'<meta name="viewport"[^\n]*$', built[:m.start()]):
+                    fail(f"{out}: Smart App Banner isn't right after the viewport meta")
+            elif b"motif" in m.group(0):
                 if not built[m.end():].startswith(b"</head>"):
                     fail(f"{out}: favicon links aren't just before </head>")
             else:
@@ -252,6 +265,20 @@ def check_files():
                 fail(f"{out} privacy block is missing {needed!r}")
         if re.search(r"user.agent|IP address", block, re.I):
             fail(f"{out} privacy block mentions data that isn't stored")
+
+    # Smart App Banner: exactly the expected tag, once, in <head> on the app pages; none anywhere else.
+    for f in sorted(DIST.rglob("*.html")):
+        page, html = f.relative_to(DIST).as_posix(), f.read_text()
+        found = re.findall(r"<meta[^>]*apple-itunes-app[^>]*>", html)
+        want = [f'<meta name="apple-itunes-app" content="app-id={BANNER[page]}">'] if page in BANNER else []
+        print(f"app banner dist/{page}: {found or 'none'}")
+        if found != want or html.count("apple-itunes-app") != len(want):
+            fail(f"{page}: app banner {found}, expected {want}")
+        elif want and html.index(want[0]) > html.index("</head>"):
+            fail(f"{page}: app banner isn't inside <head>")
+    for page in BANNER:
+        if not (DIST / page).is_file():
+            fail(f"missing dist/{page} for app banner check")
 
     # 404.html: Pages only serves real 404s when it exists. Not indexed, not in the sitemap.
     not_found = DIST / "404.html"
