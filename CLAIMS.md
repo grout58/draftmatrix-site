@@ -124,6 +124,7 @@ Not claimed: Mac or Vision Pro. No Catalyst or "Designed for iPad" setting is in
 
 - "Get the free cheat sheet each draft season" is the owner's wording.
 - "We'll email you the free cheat sheet when draft season starts." I wrote this one. It is a commitment.
+- "Signing up is optional, and you can unsubscribe anytime." was added in front of the next line on 2026-10-23 (owner's instruction). The unsubscribe promise depends on the email tool (see Open concerns).
 - "We only use your email for DraftMatrix emails. Privacy" under every signup form is the owner's wording. It links to `#email-list` on the matching privacy page (`/privacy.html` for home and football, then `/basketball-privacy.html`, `/hockey-privacy.html`, `/baseball-privacy.html`).
 - Baseball page: "…and a note when the app is out." Same caveat.
 
@@ -133,9 +134,10 @@ Not claimed: Mac or Vision Pro. No Catalyst or "Designed for iPad" setting is in
 |---|---|
 | Support pages: contact via github.com/grout58 | The link already on every legacy support page. No email address is given: none exists on the current pages, and `SUPPORT_EMAIL` stays `null` until the owner supplies one |
 | Support pages: the feedback form sends name, email, app and message | `src/feedback.js`, `src/_worker.js` (`feedback()`) |
-| Privacy: the email list collects only the address, the sport page and when | `src/_worker.js` `subscribe()` stores `{sport, sports, ts, firstTs}` under the address and nothing else. "and when" is my addition, because the timestamps are stored |
+| Privacy: the email list collects only the address, the sport pages signed up from, and when you first and most recently signed up | `src/_worker.js` `subscribe()` stores `{sport, sports, ts, firstTs}` under the address and nothing else (`sports` is every page, `ts` the latest signup, `firstTs` the first) |
 | Privacy: used only for the cheat sheet and app news; unsubscribe link in every email; never sold or shared | Owner's commitments. Nothing sends email yet, so the email tool chosen later must add an unsubscribe link to every message |
-| Privacy: feedback stores the name (optional), email, message, app and user-agent | `src/_worker.js` `feedback()` stores `{name, email, app, message, ts, ua}`. The owner's wording named only the name, email and message. I added the app and the user-agent string because both are stored too |
+| Privacy: feedback stores the name (optional), email, message, app, time sent and user-agent | `src/_worker.js` `feedback()` stores `{name, email, app, message, ts, ua}`. The owner's wording named only the name, email and message. I added the app, the time and the user-agent string because they are stored too |
+| Support pages: "Email address (used only to reply to you)" on the feedback form | Owner's instruction; matches "We use them only to reply to you" on the privacy pages |
 | Privacy: both stored with "Cloudflare, our website host" | KV bindings `SIGNUPS` / `FEEDBACK` on the Pages project; `PROVIDER` in `build.mjs` |
 | Privacy: "The apps themselves still collect no data" | Same sources as "No account, no tracking, Data Not Collected" above |
 
@@ -157,3 +159,37 @@ Not claimed: Mac or Vision Pro. No Catalyst or "Designed for iPad" setting is in
 
 - **Grandfathering is not airtight today.** Hockey's date-based fix is in 2.0.1 build 30, which was submitted 2026-10-23 and isn't live yet. Until it is approved, some $1.99 buyers of hockey builds 24+ hit the paywall. Football's date-based cutoff may only be on the local branch `fix/nfl-grandfather-paid` (`CLAUDE.md`, 2026-10-23), so a few football buyers from the minutes it sold at $1.99 on 2.0 may not be covered. The site no longer makes this claim (see Dropped). The App Store descriptions still do.
 - **Football listing name.** The live listing may still read "DraftMatrix" until 2.0.1 clears review. The site uses "DraftMatrix: Fantasy Football" as instructed.
+
+## Review-guideline audit (2026-10-23)
+
+Checked against App Store Review Guidelines concerns (accurate marketing, privacy disclosure, a working support contact) and the owner's standing rules.
+
+**What I checked**
+
+- Every new page (`src/pages/*.html`), the support and privacy sections `build.mjs` injects, and every page in `dist/` after `node build.mjs`, including titles, meta and OG/Twitter tags, alt text and aria labels.
+- Platforms: only iPhone and iPad (iOS 17+) are named. No Android, Google Play, web app, Mac, Windows, "everywhere" or "any device" wording anywhere in `dist/`.
+- Email: the signup is offered only on the website, and no copy says or implies that the apps ask for or need an email. The apps are still described as "no account" and "Data Not Collected".
+- Privacy sections against `src/_worker.js`, one field at a time. Subscribe: key `email:<address>` plus `sport`, `sports`, `ts`, `firstTs`. Feedback: `name`, `email`, `app`, `message`, `ts`, `ua`. No IP address or other headers are stored.
+- Support sections: the GitHub link and feedback form are on all four support pages. `SUPPORT_EMAIL` is still `null`: no address is shown, the HTML comment `SUPPORT_EMAIL not set` is in place, and the build prints a warning. No address was made up.
+- Brand rule: `scripts/check.py` scan is clean on the new pages and injected blocks. OG image text in `scripts/og.py` is clean too.
+- Canonical, `og:url`, `og:image`, `twitter:image`, sitemap and robots all use `https://draftmatrix.app`.
+- `python3 scripts/check.py` (without `--serve`) passes: legacy pages byte-identical outside the added block, links resolve, worker tests pass, 1.78 MB.
+
+**What I changed**
+
+- Privacy sections (`build.mjs` `privacySection`): the email list now says "which sport pages you signed up from, and when you first and most recently signed up", because `sports` holds every page and both `ts` and `firstTs` are stored. The old wording was "which sport's page … and when". Feedback now lists "the time you sent it", for `ts`, which was missing.
+- Feedback form: the email label reads "Email address (used only to reply to you)".
+- Signup forms: the note now starts "Signing up is optional, and you can unsubscribe anytime."
+- Home pricing note: "The App Store privacy label for each app on the App Store reads 'Data Not Collected.'" Baseball has no listing, so it has no label.
+- Baseball "Same pricing model": "with a DraftMatrix Pro one-time purchase, like the other apps". The old wording ("the same DraftMatrix Pro one-time purchase as the other apps") could be read as one purchase that unlocks every app, but Pro is unlocked separately in each app.
+
+**Borderline, needs the owner's call**
+
+- **Legacy privacy pages open with "DraftMatrix collects no personal data. None."** and are dated "Effective August 29, 2026". The added section says it covers the website only and that the apps still collect nothing, but the website now collects email addresses. The pages' own "Changes" paragraph promises a new effective date when the policy changes. Legacy sources can't be edited under the build rules, so it's your call whether to update the headline and date (in the source) or reword the added section.
+- **"We use them only to reply to you"** (feedback) while the user-agent is also stored. It's presumably kept for troubleshooting, which isn't the same as replying. Either widen the purpose ("to reply and to look into the problem") or stop storing `ua`.
+- **Cloudflare's own logs.** The worker stores no IP address, but Cloudflare as the host may log requests. The privacy text only describes what we store. Consider a line like the legacy pages' note about third-party server logs.
+- **No retention or deletion terms.** Neither section says how long signups or feedback are kept. Deletion is "ask us through the support page", and the only contact today is GitHub or the form itself.
+- **Unsubscribe promise.** "Unsubscribe anytime" and "every email will have an unsubscribe link" depend on an email tool that hasn't been chosen.
+- **The support contact is a GitHub profile, not an issue tracker or inbox.** Together with the feedback form it should count as a working contact. A real `SUPPORT_EMAIL` would be safer for Guideline 1.5, and the legacy support pages say "contact us and we'll get back to you".
+- **Price in the hero pitch.** "DraftMatrix Pro is $4.99 once" doesn't say "in the US". The pricing section and FAQs do ("local prices vary").
+- **Legacy football `support.html` / `privacy.html` still name the ranking publishers**, as already noted under Dropped. The legacy basketball, baseball and hockey disclaimers say "Team and league names are the property of their owners". These are legacy copy, left unchanged.

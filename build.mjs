@@ -173,7 +173,7 @@ function signup(sport, heading = "Get the free cheat sheet each draft season") {
       <button type="submit">Sign up</button>
     </form>
     <p class="signup-status" role="status" aria-live="polite"></p>
-    <p class="signup-note">We only use your email for DraftMatrix emails. <a href="${PRIVACY[sport]}#email-list">Privacy</a></p>${note}
+    <p class="signup-note">Signing up is optional, and you can unsubscribe anytime. We only use your email for DraftMatrix emails. <a href="${PRIVACY[sport]}#email-list">Privacy</a></p>${note}
   </div>`;
 }
 
@@ -229,7 +229,7 @@ ${reach}
 <form class="dm-feedback" action="/api/feedback" method="post" data-app="${app}" novalidate>
   <label for="dm-name">Name <span>(optional)</span>
     <input id="dm-name" name="name" type="text" autocomplete="name" maxlength="200"></label>
-  <label for="dm-email">Email address
+  <label for="dm-email">Email address <span>(used only to reply to you)</span>
     <input id="dm-email" name="email" type="email" autocomplete="email" inputmode="email" required></label>
   <label for="dm-app">App
     <select id="dm-app" name="app">${options}</select></label>
@@ -254,8 +254,8 @@ function privacySection(support) {
 </style>
 <h2 id="email-list">Email list and feedback form (added October 2026)</h2>
 <p>This section covers the draftmatrix.app website only. The apps themselves still collect no data.</p>
-<p><strong>Email list.</strong> If you join the email list, we collect only your email address, which sport's page you signed up from, and when. We use it only to send the draft-season cheat sheet and DraftMatrix app news. You can unsubscribe anytime: every email will have an unsubscribe link, or you can ask us to remove you through the <a href="${support}">support page</a>.</p>
-<p><strong>Feedback form.</strong> If you send feedback, we receive the name (optional), email address and message you send, the app you pick, and your browser's user-agent string. We use them only to reply to you.</p>
+<p><strong>Email list.</strong> If you join the email list, we collect only your email address, which sport pages you signed up from, and when you first and most recently signed up. We use it only to send the draft-season cheat sheet and DraftMatrix app news. You can unsubscribe anytime: every email will have an unsubscribe link, or you can ask us to remove you through the <a href="${support}">support page</a>.</p>
+<p><strong>Feedback form.</strong> If you send feedback, we receive the name (optional), email address and message you send, the app you pick, the time you sent it, and your browser's user-agent string. We use them only to reply to you.</p>
 <p>Both are stored with ${esc(PROVIDER)}. We never sell or share your email address or messages.</p>
 </section>`;
 }
