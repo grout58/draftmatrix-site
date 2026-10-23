@@ -1,5 +1,5 @@
 // Runs dist/_worker.js in Node against fake KV and ASSETS bindings, with a
-// mocked fetch standing in for Turnstile's siteverify endpoint.
+// mocked fetch standing in for Turnstile's siteverify endpoint and Buttondown's API.
 // Called by scripts/check.py; also runnable alone: `node scripts/worker-test.mjs`.
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -12,7 +12,15 @@ const SECRET = "test-secret";
 const GOOD = "good-token";
 const DOWN = "siteverify-down";
 const verifyCalls = [];
+// Every request to Buttondown, and the stub answering them (set per test).
+const BUTTONDOWN = "https://api.buttondown.com/v1/subscribers";
+const buttondownCalls = [];
+let buttondownReply = () => new Response("{}", { status: 201 });
 globalThis.fetch = async (url, init = {}) => {
+  if (String(url).includes("buttondown.com")) {
+    buttondownCalls.push({ url: String(url), init, body: JSON.parse(init.body) });
+    return buttondownReply(buttondownCalls.at(-1));
+  }
   if (url !== "https://challenges.cloudflare.com/turnstile/v0/siteverify") {
     throw new Error(`unexpected fetch ${url}`);
   }
@@ -195,6 +203,114 @@ async function call(request, env) {
   });
   r = await call(form, env);
   check("form-encoded subscribe works", r.status === 200 && SIGNUPS.map.has("email:form@example.com"));
+}
+
+// ---- Buttondown forwarding ----
+{
+  const KEY = "bd-test-key-123";
+  const EMAIL_IN = "BD.Fan@Example.com";
+  const EMAIL = "bd.fan@example.com";
+  const IP = "198.51.100.23";
+  // Records what the worker logs and schedules while handling one request.
+  async function run(extra, { ctx = true, sport = "mlb", seed } = {}) {
+    const SIGNUPS = new FakeKV();
+    if (seed) SIGNUPS.map.set(`email:${EMAIL}`, JSON.stringify(seed));
+    const env = { ASSETS, SIGNUPS, TURNSTILE_SECRET: SECRET, ...extra };
+    const waited = [];
+    const context = ctx ? { waitUntil: (p) => waited.push(p) } : undefined;
+    const logged = [];
+    const saved = { log: console.log, warn: console.warn, error: console.error, info: console.info };
+    for (const name of Object.keys(saved)) console[name] = (...args) => logged.push(args.map(String).join(" "));
+    const before = buttondownCalls.length;
+    let res;
+    try {
+      res = await worker.fetch(post("/api/subscribe", { email: EMAIL_IN, sport },
+        { headers: { "cf-connecting-ip": IP } }), env, context);
+      await Promise.all(waited);
+    } finally {
+      Object.assign(console, saved);
+    }
+    const text = await res.text();
+    return {
+      status: res.status, text, headers: JSON.stringify([...res.headers]),
+      calls: buttondownCalls.slice(before), waited: waited.length, logged, SIGNUPS,
+    };
+  }
+  const same = (a, b) => a.status === b.status && a.text === b.text && a.headers === b.headers;
+  const leaks = (r) => r.logged.some((line) => /bd-test-key|bd\.fan|198\.51\.100/i.test(line));
+
+  buttondownReply = () => new Response("{}", { status: 201 });
+  const base = await run({});
+  check("baseline subscribe -> 200 {ok:true}, no Buttondown call, no waitUntil",
+    base.status === 200 && base.text === '{"ok":true}' && base.calls.length === 0 && base.waited === 0);
+
+  const off = [
+    ["key only, ENABLED unset", { BUTTONDOWN_API_KEY: KEY }],
+    ['key, ENABLED="false"', { BUTTONDOWN_API_KEY: KEY, BUTTONDOWN_ENABLED: "false" }],
+    ['key, ENABLED="TRUE"', { BUTTONDOWN_API_KEY: KEY, BUTTONDOWN_ENABLED: "TRUE" }],
+    ['ENABLED="true" without key', { BUTTONDOWN_ENABLED: "true" }],
+    ['empty key, ENABLED="true"', { BUTTONDOWN_API_KEY: "", BUTTONDOWN_ENABLED: "true" }],
+    ["key + tags, ENABLED unset", { BUTTONDOWN_API_KEY: KEY, BUTTONDOWN_TAGS: "true" }],
+  ];
+  for (const [name, extra] of off) {
+    const r = await run(extra);
+    check(`Buttondown off (${name}): same response, no request, no waitUntil`,
+      same(r, base) && r.calls.length === 0 && r.waited === 0 && r.logged.length === 0, r.headers);
+  }
+  const noCtx = await run({ BUTTONDOWN_API_KEY: KEY, BUTTONDOWN_ENABLED: "true" }, { ctx: false });
+  check("Buttondown on but no ctx: same response, no request", same(noCtx, base) && noCtx.calls.length === 0);
+
+  const ON = { BUTTONDOWN_API_KEY: KEY, BUTTONDOWN_ENABLED: "true" };
+  let r = await run(ON, { seed: { sport: "nfl", sports: ["nfl"], ts: "2026-10-01T00:00:00.000Z" } });
+  const call = r.calls[0];
+  const h = new Headers(call?.init.headers);
+  check("Buttondown on: same response to the browser", same(r, base));
+  check("Buttondown on: KV still written first",
+    JSON.stringify(JSON.parse(r.SIGNUPS.map.get(`email:${EMAIL}`)).sports) === '["nfl","mlb"]');
+  check("Buttondown on: exactly one POST to /v1/subscribers via waitUntil",
+    r.calls.length === 1 && r.waited === 1 && call.url === BUTTONDOWN && call.init.method === "POST");
+  check("Buttondown headers: Token auth, collision add, JSON",
+    h.get("authorization") === `Token ${KEY}` && h.get("x-buttondown-collision-behavior") === "add" &&
+    h.get("content-type") === "application/json");
+  check("Buttondown request has a timeout signal", call?.init.signal instanceof AbortSignal);
+  check("Buttondown body: email, metadata (merged sports), ip; no type, no tags",
+    JSON.stringify(call?.body) === JSON.stringify({
+      email_address: EMAIL, metadata: { source: "draftmatrix.app", sports: "nfl,mlb" }, ip_address: IP,
+    }), JSON.stringify(call?.body));
+  check("Buttondown logs only the status", JSON.stringify(r.logged) === '["buttondown 201"]', JSON.stringify(r.logged));
+
+  r = await run({ ...ON, BUTTONDOWN_TAGS: "true" });
+  check('BUTTONDOWN_TAGS="true": tags ["mlb-launch"], one request',
+    r.calls.length === 1 && JSON.stringify(r.calls[0].body.tags) === '["mlb-launch"]' && !("type" in r.calls[0].body));
+  r = await run({ ...ON, BUTTONDOWN_TAGS: "yes" });
+  check('BUTTONDOWN_TAGS other than "true": no tags', r.calls.length === 1 && !("tags" in r.calls[0].body));
+
+  buttondownReply = ({ body }) => new Response('{"code":"feature_disabled"}', { status: body.tags ? 403 : 201 });
+  r = await run({ ...ON, BUTTONDOWN_TAGS: "true" }, { sport: "cricket" });
+  check("tagged request gets 403 -> retried once without tags",
+    same(r, base) && r.calls.length === 2 && JSON.stringify(r.calls[0].body.tags) === '["all-launch"]' &&
+    !("tags" in r.calls[1].body) && JSON.stringify(r.logged) === '["buttondown 403","buttondown 201"]',
+    JSON.stringify(r.logged));
+  buttondownReply = () => new Response("{}", { status: 403 });
+  r = await run(ON);
+  check("untagged 403 is not retried", r.calls.length === 1 && same(r, base));
+
+  const outcomes = [
+    ["500", () => new Response("oops", { status: 500 }), "buttondown 500"],
+    ["400", () => new Response('{"detail":"bad"}', { status: 400 }), "buttondown 400"],
+    ["429", () => new Response("slow down", { status: 429 }), "buttondown 429"],
+    ["fetch throws", () => { throw new TypeError("network down for bd.fan@example.com"); }, "buttondown error"],
+    ["timeout", () => { throw new DOMException("timed out", "TimeoutError"); }, "buttondown timeout"],
+  ];
+  for (const [name, reply, log] of outcomes) {
+    buttondownReply = reply;
+    r = await run(ON);
+    check(`Buttondown ${name}: browser still gets 200 {ok:true}, logs "${log}"`,
+      same(r, base) && r.calls.length === 1 && JSON.stringify(r.logged) === JSON.stringify([log]),
+      JSON.stringify(r.logged));
+    check(`Buttondown ${name}: nothing logged contains the key, email or IP`, !leaks(r));
+  }
+  buttondownReply = () => new Response("{}", { status: 201 });
 }
 
 // ---- feedback ----

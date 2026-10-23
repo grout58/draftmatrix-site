@@ -18,6 +18,8 @@
 //   /api/subscribe and /api/feedback. There is no functions/ directory.
 // - Both forms carry a Turnstile widget; the Turnstile script is added only to
 //   pages that have a form.
+// - BUTTONDOWN_LIVE (off) adds Buttondown to the privacy pages' email-list copy and
+//   changes the signup success message in dist/assets/signup.js to "confirm by email".
 
 import { cpSync, copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -26,6 +28,20 @@ import { fileURLToPath } from "node:url";
 // True once the SIGNUPS KV binding exists in the Pages project.
 // While false, every signup form carries a visible "Preview" note.
 const SIGNUP_LIVE = true;
+
+// True once the worker forwards signups to Buttondown (BUTTONDOWN_API_KEY and
+// BUTTONDOWN_ENABLED="true" on the Pages project; see DEPLOY.md). It only changes
+// copy: the privacy pages then name Buttondown, and the signup success message
+// asks people to confirm by email. While false, the output is as before.
+const BUTTONDOWN_LIVE = false;
+const BUTTONDOWN_PRIVACY = "https://buttondown.com/legal/privacy";
+// scripts/check.py also builds with Buttondown on, into a temp dir: DM_BUTTONDOWN_LIVE=1
+// counts only together with DM_DIST (the output directory), so it never changes dist/.
+const BUTTONDOWN = BUTTONDOWN_LIVE || (!!process.env.DM_DIST && process.env.DM_BUTTONDOWN_LIVE === "1");
+// The signup success message in src/signup.js, and its replacement with BUTTONDOWN on
+// (Buttondown emails a confirmation link first).
+const SIGNUP_OK = `ok: "Thanks. You're on the list for the cheat sheet."`;
+const SIGNUP_OK_CONFIRM = `ok: "Thanks. Check your inbox and confirm your email to get on the list for the cheat sheet."`;
 
 // Support email: the primary contact in the "Contact us" sections, and added to
 // the privacy pages' Contact line and deletion sentence. If set to null, those
@@ -41,7 +57,7 @@ const TURNSTILE_SITEKEY = "0x4AAAAAAFjE4WGiG4z1Gaww";
 const TURNSTILE_SCRIPT = "https://challenges.cloudflare.com/turnstile/v0/api.js";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
-const DIST = join(ROOT, "dist");
+const DIST = process.env.DM_DIST || join(ROOT, "dist");
 const ORIGIN = "https://draftmatrix.app";
 const YEAR = 2026;
 
@@ -338,6 +354,10 @@ ${reach}
 <script src="/assets/feedback.js" defer></script>`;
 }
 
+// With BUTTONDOWN on: who else gets signups, matching forwardToButtondown() in
+// src/_worker.js (email address, sports, IP address).
+const BUTTONDOWN_EMAIL_LIST = `Your email address and sport(s) are stored with ${esc(PROVIDER)}, and sent to Buttondown, our email provider, which sends the emails, asks you to confirm your subscription by email, and handles unsubscribes (every email has an unsubscribe link). Buttondown also receives your IP address to filter spam; see <a href="${BUTTONDOWN_PRIVACY}">Buttondown's privacy policy</a>.`;
+
 // Must list exactly the fields src/_worker.js stores (see CLAIMS.md).
 function privacySection(support) {
   return `<section class="dm-added" aria-labelledby="email-list">
@@ -348,9 +368,9 @@ function privacySection(support) {
 <h2 id="email-list">Website email list and feedback form</h2>
 <p><em>Added October 23, 2026</em></p>
 <p>The DraftMatrix apps themselves still collect no data. This section covers only the optional forms on the draftmatrix.app website.</p>
-<p><strong>Email list.</strong> If you sign up, we store your email address, which sport page(s) you signed up from, and when you first and most recently signed up. We use it only to send the draft-season cheat sheet and DraftMatrix app news.</p>
+<p><strong>Email list.</strong> If you sign up, we store your email address, which sport page(s) you signed up from, and when you first and most recently signed up. We use it only to send the draft-season cheat sheet and DraftMatrix app news.${BUTTONDOWN ? ` ${BUTTONDOWN_EMAIL_LIST}` : ""}</p>
 <p><strong>Feedback form.</strong> If you send feedback, we store your name (optional), your email address, the app you chose, your message, and the time you sent it. We use it only to reply to you.</p>
-<p>Both are stored with ${esc(PROVIDER)}, and kept until you unsubscribe or ask us to delete them. You can unsubscribe anytime, or ask for deletion ${MAILTO ? `by emailing ${MAILTO} or ` : ""}through the <a href="${support}">support page</a>. We never sell or share them.</p>
+<p>Both are stored with ${esc(PROVIDER)}, and kept until you unsubscribe or ask us to delete them. You can unsubscribe anytime, or ask for deletion ${MAILTO ? `by emailing ${MAILTO} or ` : ""}through the <a href="${support}">support page</a>. ${BUTTONDOWN ? "We never sell them, and share them only with the providers named here." : "We never sell or share them."}</p>
 <p>To block spam, the forms use Cloudflare Turnstile, which checks your browser when you use the forms; see <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's privacy policy</a>.</p>
 </section>`;
 }
@@ -499,7 +519,13 @@ function build() {
 
   cpSync(join(ROOT, "assets"), join(DIST, "assets"), { recursive: true });
   copyFileSync(join(ROOT, "src", "site.css"), join(DIST, "assets", "site.css"));
-  copyFileSync(join(ROOT, "src", "signup.js"), join(DIST, "assets", "signup.js"));
+  if (BUTTONDOWN) {
+    const js = readFileSync(join(ROOT, "src", "signup.js"), "utf8");
+    if (!js.includes(SIGNUP_OK)) throw new Error("signup success message not found in src/signup.js");
+    writeFileSync(join(DIST, "assets", "signup.js"), js.replace(SIGNUP_OK, SIGNUP_OK_CONFIRM));
+  } else {
+    copyFileSync(join(ROOT, "src", "signup.js"), join(DIST, "assets", "signup.js"));
+  }
   copyFileSync(join(ROOT, "src", "feedback.js"), join(DIST, "assets", "feedback.js"));
 
   // Pages advanced mode. _routes.json limits the worker to /api/*, so static
@@ -543,7 +569,7 @@ function build() {
 
   writeFileSync(join(DIST, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${ORIGIN}/sitemap.xml\n`);
 
-  console.log(`Built ${PAGES.length} pages + 404.html + ${Object.keys(LEGACY).length} legacy files into dist/ (SIGNUP_LIVE=${SIGNUP_LIVE})`);
+  console.log(`Built ${PAGES.length} pages + 404.html + ${Object.keys(LEGACY).length} legacy files into ${DIST === join(ROOT, "dist") ? "dist/" : DIST} (SIGNUP_LIVE=${SIGNUP_LIVE}, BUTTONDOWN_LIVE=${BUTTONDOWN})`);
 }
 
 build();

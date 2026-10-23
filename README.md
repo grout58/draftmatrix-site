@@ -20,7 +20,7 @@ The marketing and support site for the DraftMatrix apps, for Cloudflare Pages at
 | `/mlb/` | `#1d2430` → `#0b0f14` | tile motif (there is no baseball app icon) | tile motif (`assets/icons/motif.svg`, `motif-64.png`, `motif-180.png`) |
 
 ```
-build.mjs              build script (SIGNUP_LIVE, SUPPORT_EMAIL, PROVIDER, TURNSTILE_SITEKEY at the top)
+build.mjs              build script (SIGNUP_LIVE, BUTTONDOWN_LIVE, SUPPORT_EMAIL, PROVIDER, TURNSTILE_SITEKEY at the top)
 src/pages/*.html       page bodies: home, nfl, nba, nhl, mlb
 src/site.css           shared styles (copied to dist/assets/site.css)
 src/signup.js          signup form handler (copied to dist/assets/signup.js)
@@ -33,6 +33,7 @@ scripts/motif_icon.py  draws assets/icons/motif.svg, motif-64.png, motif-180.png
 scripts/og.py          regenerates assets/og/*.png (1200x630)
 scripts/export-signups.mjs   SIGNUPS KV -> signups.csv (Cloudflare REST API)
 scripts/export-feedback.mjs  FEEDBACK KV -> feedback.csv
+scripts/buttondown-import.mjs  one-time import of signups into Buttondown (off until enabled; DEPLOY.md)
 scripts/check.py       checks dist/ (legacy pages, brand scan, links, worker tests, size)
 scripts/worker-test.mjs  runs dist/_worker.js in node with fake KV and ASSETS
 scripts/verify-deploy.py compares a deployed site with dist/ by SHA-256 (DEPLOY.md)
