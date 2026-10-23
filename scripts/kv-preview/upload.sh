@@ -2,8 +2,9 @@
 # Preview-only deploy path used on 2026-10-23 because wrangler wasn't logged in
 # on the Mac. Uploads dist/ to the SITE KV namespace through a temporary,
 # nonce-protected upload Worker, and composes the preview _worker.js
-# (shim + src/_worker.js). Normal deploys should use:
-#   npx wrangler pages deploy dist --project-name draftmatrix-site --branch site-v2
+# (shim + src/_worker.js) at /__deploy/worker.js for deploy-via-api.js.
+# Full steps: scripts/kv-preview/README.md. Normal deploys should use:
+#   npx wrangler pages deploy dist --project-name draftmatrix-site --branch main
 # Usage: UPLOAD_URL=https://<temp-worker> UPLOAD_NONCE=... sh scripts/kv-preview/upload.sh
 set -eu
 : "${UPLOAD_URL:?}" "${UPLOAD_NONCE:?}"

@@ -1,0 +1,47 @@
+# Build, check and deploy dist/ to the Cloudflare Pages project "draftmatrix-site".
+# Needs repository secrets CLOUDFLARE_API_TOKEN (Account / Cloudflare Pages / Edit)
+# and CLOUDFLARE_ACCOUNT_ID; see DEPLOY.md. Without the token the deploy step
+# is skipped and the job still passes.
+#
+# wrangler uploads dist/ as Pages static assets and dist/_worker.js gets the real
+# env.ASSETS, so scripts/kv-preview/ (the KV shim) isn't used here.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Build
+        run: node build.mjs
+
+      - name: Check
+        run: python3 scripts/check.py
+
+      - name: Skip deploy (no token)
+        if: env.CLOUDFLARE_API_TOKEN == ''
+        run: echo "::notice title=Deploy skipped::CLOUDFLARE_API_TOKEN is not set, so dist/ was built and checked but not deployed. See DEPLOY.md."
+
+      - name: Deploy to Cloudflare Pages
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: npx --yes wrangler@4 pages deploy dist --project-name draftmatrix-site --branch main

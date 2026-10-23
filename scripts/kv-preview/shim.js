@@ -37,6 +37,10 @@ async function serveKV(request, env) {
     const to = matchRule(rule, path);
     if (to !== null && to !== path) return Response.redirect(new URL(to, url).toString(), rule.code);
   }
+  // Like real Pages, never serve control files (/_redirects, /_routes.json) or
+  // anything else under /_ (e.g. the staged /__deploy/worker.js). /_redirects is
+  // still read above through kvGet, which this check doesn't touch.
+  if (path.startsWith('/_')) return notFound(env);
   // Pretty URLs: /x.html -> /x, /dir/index.html -> /dir/
   if (path.endsWith('/index.html')) return Response.redirect(new URL(path.slice(0, -10) + url.search, url).toString(), 308);
   if (path.endsWith('.html')) return Response.redirect(new URL(path.slice(0, -5) + url.search, url).toString(), 308);
@@ -51,6 +55,9 @@ async function serveKV(request, env) {
     }
   }
   if (r) return respond(r);
+  return notFound(env);
+}
+async function notFound(env) {
   const nf = await kvGet(env, '/404.html');
   return nf ? respond(nf, 404) : new Response('Not found', { status: 404 });
 }

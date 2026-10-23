@@ -35,6 +35,10 @@ scripts/export-signups.mjs   SIGNUPS KV -> signups.csv (Cloudflare REST API)
 scripts/export-feedback.mjs  FEEDBACK KV -> feedback.csv
 scripts/check.py       checks dist/ (legacy pages, brand scan, links, worker tests, size)
 scripts/worker-test.mjs  runs dist/_worker.js in node with fake KV and ASSETS
+scripts/verify-deploy.py compares a deployed site with dist/ by SHA-256 (DEPLOY.md)
+scripts/kv-preview/    stopgap API/KV deploy path (its README.md)
+.github/workflows/deploy.yml  build, check and wrangler deploy on push to main
+DEPLOY.md              how the site is deployed and the options
 *.html at the root     legacy support/privacy pages, never edited
 CLAIMS.md              every factual claim on the site and the source that backs it
 ```
@@ -83,12 +87,13 @@ python3 scripts/og.py        # Open Graph images (needs the icons first)
 
 ## Deploy
 
+See [DEPLOY.md](DEPLOY.md) for how the live site is deployed, the options for automating it (GitHub Actions + wrangler is recommended), and `scripts/verify-deploy.py`.
+
 `dist/` is the complete deployable site, including `dist/_worker.js`. There is no `functions/` directory: the site uses Pages "advanced mode", which works with Direct Upload because the worker is a single dependency-free ES module that needs no compiling.
 
 ```sh
 node build.mjs
-# then upload dist/ with the Direct Upload API, or:
-npx wrangler pages deploy dist --project-name draftmatrix-site --branch site-v2
+npx wrangler@4 pages deploy dist --project-name draftmatrix-site --branch main
 ```
 
 ### How the worker and static files fit together
