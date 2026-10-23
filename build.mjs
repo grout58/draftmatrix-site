@@ -8,11 +8,12 @@
 //   <!-- dm-added:end --> just before the closing footer lines. The old
 //   index.html (football support) becomes support.html; the new home page is
 //   index.html.
-// - Two small inline edits, each wrapped in <!-- dm-inline:start --> and
+// - Small inline edits, each wrapped in <!-- dm-inline:start --> and
 //   <!-- dm-inline:end --> on one line: each privacy page's Contact sentence is
 //   replaced by one naming only the support email and support page (no GitHub),
-//   and the motif favicon links go just before </head> on baseball.html and
-//   baseball-privacy.html.
+//   the motif favicon links go just before </head> on baseball.html and
+//   baseball-privacy.html, and the Smart App Banner meta goes after the viewport
+//   meta on the football, hoops and hockey support pages.
 // - src/_worker.js becomes dist/_worker.js (Pages advanced mode) and handles
 //   /api/subscribe and /api/feedback. There is no functions/ directory.
 // - Both forms carry a Turnstile widget; the Turnstile script is added only to
@@ -50,6 +51,13 @@ const APP_STORE = {
   nhl: "https://apps.apple.com/us/app/id6811083062",
 };
 
+// Safari's Smart App Banner, on pages with `appId` (a key of APP_STORE).
+function appBanner(sport) {
+  const id = APP_STORE[sport]?.match(/\/id(\d+)$/)?.[1];
+  if (!id) throw new Error(`no App Store id for ${sport}`);
+  return `<meta name="apple-itunes-app" content="app-id=${id}">`;
+}
+
 // <meta name="theme-color"> per page tint (the darker end of each gradient).
 const THEME_COLOR = { brand: "#0b0f14", nfl: "#07170d", nba: "#130e08", nhl: "#071019" };
 
@@ -63,11 +71,11 @@ const APP_NAME = {
 // Legacy files: source at the repo root -> path in dist. The sources are never
 // edited; `add` names the section injected into the dist copy.
 const LEGACY = {
-  "index.html": { out: "support.html", add: "contact", app: "football" },
+  "index.html": { out: "support.html", add: "contact", app: "football", appId: "nfl" },
   "privacy.html": { out: "privacy.html", add: "privacy", support: "support.html" },
-  "hockey.html": { out: "hockey.html", add: "contact", app: "hockey" },
+  "hockey.html": { out: "hockey.html", add: "contact", app: "hockey", appId: "nhl" },
   "hockey-privacy.html": { out: "hockey-privacy.html", add: "privacy", support: "hockey.html" },
-  "basketball.html": { out: "basketball.html", add: "contact", app: "hoops" },
+  "basketball.html": { out: "basketball.html", add: "contact", app: "hoops", appId: "nba" },
   "basketball-privacy.html": { out: "basketball-privacy.html", add: "privacy", support: "basketball.html" },
   "baseball.html": { out: "baseball.html", add: "contact", app: "baseball", icon: "motif" },
   "baseball-privacy.html": { out: "baseball-privacy.html", add: "privacy", support: "baseball.html", icon: "motif" },
@@ -102,6 +110,7 @@ const PAGES = [
     og: "default",
     theme: "brand",
     icon: "nfl",
+    appId: "nfl",
   },
   {
     src: "nfl.html",
@@ -114,6 +123,7 @@ const PAGES = [
     og: "nfl",
     theme: "nfl",
     icon: "nfl",
+    appId: "nfl",
   },
   {
     src: "nba.html",
@@ -126,6 +136,7 @@ const PAGES = [
     og: "nba",
     theme: "nba",
     icon: "nba",
+    appId: "nba",
   },
   {
     src: "nhl.html",
@@ -138,6 +149,7 @@ const PAGES = [
     og: "nhl",
     theme: "nhl",
     icon: "nhl",
+    appId: "nhl",
   },
   {
     src: "mlb.html",
@@ -419,7 +431,7 @@ function layout(page, body) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(page.title)}</title>
+${page.appId ? `${appBanner(page.appId)}\n` : ""}<title>${esc(page.title)}</title>
 <meta name="description" content="${esc(page.description)}">
 ${page.noindex ? `<meta name="robots" content="noindex">` : `<link rel="canonical" href="${url}">`}
 <meta name="color-scheme" content="dark">
@@ -475,6 +487,12 @@ function build() {
     let out = inject(src, html, section);
     if (page.add === "privacy" && MAILTO) out = replaceContact(src, out, page.support);
     if (page.icon) out = insertInline(src, out, out.indexOf("</head>"), iconLinks(page.icon));
+    if (page.appId) {
+      // At the end of the viewport meta's line, inside <head>.
+      const viewport = out.indexOf('<meta name="viewport"');
+      const at = viewport < 0 || viewport > out.indexOf("</head>") ? -1 : out.indexOf("\n", viewport);
+      out = insertInline(src, out, at, appBanner(page.appId));
+    }
     writeFileSync(join(DIST, page.out), out);
   }
   if (!SUPPORT_EMAIL) console.warn("WARNING: SUPPORT_EMAIL not set; support and privacy pages show GitHub + the feedback form only.");
