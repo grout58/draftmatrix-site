@@ -12,6 +12,10 @@ Checks:
   in visible text, alt/aria text or meta tags (URL slugs like /nfl/ and form values
   are not visible and are allowed).
 - every local link and image in the new pages and injected blocks resolves to a file in dist/.
+- the Turnstile script loads on exactly the pages that have a form, each widget
+  carries the sitekey, and it is the only third-party script.
+- there is no baseball app icon (no assets/icons/mlb-*, no reference to one).
+- the privacy blocks don't mention data the worker no longer stores (user-agent).
 - dist/_worker.js passes scripts/worker-test.mjs (run in node with fake KV and ASSETS).
 - functions/ is gone, and dist/ stays under the size budget.
 """
@@ -52,8 +56,12 @@ def visible(html):
     """Text people (and link previews) see: page text plus alt/aria/meta values, minus URLs."""
     attrs = [v for _, v in VISIBLE_ATTR.findall(html) if not re.match(r"(https?://|/)", v)]
     return TAG.sub(" ", SCRIPT.sub("", html)) + "\n" + "\n".join(attrs)
-LOCAL_REF = re.compile(r'(?:href|src|srcset)="(/[^"#?]*)')
+LOCAL_REF = re.compile(r'(?:href|src)="(/[^"#?]*)')
+SRCSET = re.compile(r'srcset="([^"]*)"')
 RELATIVE_REF = re.compile(r'(?:href|src)="([\w-]+\.html)')
+SCRIPT_SRC = re.compile(r'<script\b[^>]*\bsrc="([^"]+)"')
+TURNSTILE_SCRIPT = "https://challenges.cloudflare.com/turnstile/v0/api.js"
+SITEKEY = re.search(r'TURNSTILE_SITEKEY = "([^"]+)"', (ROOT / "build.mjs").read_text()).group(1)
 BUDGET = 8 * 1024 * 1024
 
 failures = []
@@ -95,12 +103,51 @@ def check_files():
         if hits:
             fail(f"{page} mentions {hits}")
         # Legacy pages all sit at the dist root, so their relative links resolve from there.
-        for ref in LOCAL_REF.findall(text) + RELATIVE_REF.findall(text):
+        srcset = [part.split()[0] for s in SRCSET.findall(text) for part in s.split(",") if part.strip()]
+        for ref in LOCAL_REF.findall(text) + RELATIVE_REF.findall(text) + srcset:
             target = DIST / ref.lstrip("/")
             if ref.endswith("/"):
                 target = target / "index.html"
             if not target.exists():
                 fail(f"{page} links to missing {ref}")
+
+    # Turnstile: script on exactly the pages with a widget; no other third-party script.
+    pages = {p: (DIST / p).read_text() for p in NEW + list(LEGACY.values())}
+    for page, html in pages.items():
+        widgets = re.findall(r'<div class="cf-turnstile"[^>]*>', html)
+        scripts = SCRIPT_SRC.findall(html)
+        external = [s for s in scripts if not s.startswith("/")]
+        forms = len(re.findall(r"<form\b", html))
+        print(f"turnstile dist/{page}: {forms} form(s), {len(widgets)} widget(s), script {'yes' if TURNSTILE_SCRIPT in scripts else 'no'}")
+        if len(widgets) != forms:
+            fail(f"{page}: {forms} form(s) but {len(widgets)} Turnstile widget(s)")
+        if any(f'data-sitekey="{SITEKEY}"' not in w for w in widgets):
+            fail(f"{page}: Turnstile widget without the sitekey")
+        if (TURNSTILE_SCRIPT in scripts) != bool(widgets) or scripts.count(TURNSTILE_SCRIPT) > 1:
+            fail(f"{page}: Turnstile script should load once, and only on a page with a form")
+        if any(s != TURNSTILE_SCRIPT for s in external):
+            fail(f"{page}: unexpected third-party script {external}")
+        for tag in re.findall(r'<script\b[^>]*' + re.escape(TURNSTILE_SCRIPT) + r'[^>]*>', html):
+            if not re.search(r"\basync\b", tag) or not re.search(r"\bdefer\b", tag):
+                fail(f"{page}: Turnstile script must be async defer")
+
+    # No baseball app icon exists, so none may be shipped or referenced.
+    mlb_icons = sorted(p.name for p in (DIST / "assets" / "icons").glob("mlb-*"))
+    if mlb_icons:
+        fail(f"baseball icon files in dist: {mlb_icons}")
+    for page, html in pages.items():
+        if "icons/mlb" in html:
+            fail(f"{page} references a baseball app icon")
+
+    # Privacy blocks must match what the worker stores.
+    for out in [o for o in LEGACY.values() if "privacy" in o]:
+        block = b"".join(ADDED.findall((DIST / out).read_bytes())).decode()
+        for needed in ["Added October 23, 2026", "collect no data", "Cloudflare Turnstile",
+                       "https://www.cloudflare.com/privacypolicy/"]:
+            if needed not in block:
+                fail(f"{out} privacy block is missing {needed!r}")
+        if re.search(r"user.agent|IP address", block, re.I):
+            fail(f"{out} privacy block mentions data that isn't stored")
 
     size = sum(f.stat().st_size for f in DIST.rglob("*") if f.is_file())
     print(f"dist size: {size / 1024 / 1024:.2f} MB")

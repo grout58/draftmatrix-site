@@ -1,51 +1,45 @@
-/* DraftMatrix site — one shared stylesheet. System fonts only, light + dark. */
+/* DraftMatrix site — one shared stylesheet. System fonts only, dark UI.
+   Colors follow the app icons: a dark sport-tinted background, glossy
+   tiles in pink / green / blue, lower tiers fading into the background. */
 
 :root {
-  --bg: #ffffff;
-  --bg-alt: #f4f5f7;
-  --card: #ffffff;
-  --text: #16181d;
-  --muted: #555b66;
-  --line: #dfe2e7;
-  --link: #0a5bd6;
-  --accent: #0a5bd6;
-  --accent-text: #ffffff;
-  --ok: #157a46;
-  --warn: #9a5b00;
-  --err: #b3261e;
-  /* the family icon's tier-grid columns */
-  --tier-1: #ff5c7a;
-  --tier-2: #3ddc97;
-  --tier-3: #4cb8ff;
-  --radius: 14px;
+  /* page tint: --hi at the top, fading to --bg (brand neutral by default) */
+  --bg: #0b0f14;
+  --hi: #1d2430;
+  --alt: rgba(255, 255, 255, .035);
+  --card: rgba(255, 255, 255, .055);
+  --card-line: rgba(255, 255, 255, .13);
+  --line: rgba(255, 255, 255, .12);
+  --text: #f3f5f7;
+  --muted: #c9cfd8;
+  --link: #8fd0ff;
+  --field: #7d8796;
+  --accent: #4eb9ff;
+  --accent-text: #04121f;
+  --ok: #5fe3a8;
+  --warn: #ffc46b;
+  --err: #ffb3c0;
+  /* the icon's top-row tiles */
+  --tier-1: #ff5e7d;
+  --tier-2: #3fde9b;
+  --tier-3: #4eb9ff;
+  --radius: 18px;
   --wrap: 1080px;
-  color-scheme: light dark;
+  color-scheme: dark;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0d0f13;
-    --bg-alt: #151820;
-    --card: #181b23;
-    --text: #f2f3f5;
-    --muted: #a7adb8;
-    --line: #2a2f3a;
-    --link: #6cb6ff;
-    --accent: #4c9dff;
-    --accent-text: #06101f;
-    --ok: #4cd08a;
-    --warn: #f0b45a;
-    --err: #ff8a80;
-  }
-}
+/* sport tints, from each app icon's background */
+.theme-nfl { --bg: #07170d; --hi: #284a33; }
+.theme-nba { --bg: #130e08; --hi: #2f1e13; }
+.theme-nhl { --bg: #071019; --hi: #233851; }
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; background: var(--bg); }
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: linear-gradient(180deg, var(--hi) 0, var(--bg) 760px) no-repeat var(--bg);
   color: var(--text);
   font: 17px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
@@ -69,6 +63,43 @@ a:hover { text-decoration-thickness: 2px; }
 }
 .skip:focus { left: 8px; top: 8px; }
 
+/* ---------- tile motif (brand pattern, not an app icon) ---------- */
+
+.motif {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 9% 8%;
+  align-content: center; padding: 17% 14%; aspect-ratio: 1;
+  border-radius: 23%;
+  background: linear-gradient(160deg, rgba(255,255,255,.13), rgba(255,255,255,.02) 55%), var(--hi);
+  border: 1px solid rgba(255, 255, 255, .2);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 18px 40px rgba(0,0,0,.45);
+}
+.motif i {
+  aspect-ratio: 3 / 2; border-radius: 26% / 38%;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.42), rgba(255,255,255,0) 52%),
+    var(--c);
+  border: 1px solid rgba(255, 255, 255, .28);
+  box-shadow: inset 0 -3px 6px rgba(0,0,0,.18), 0 4px 10px rgba(0,0,0,.35);
+}
+.motif i:nth-child(3n+1) { --c: var(--tier-1); }
+.motif i:nth-child(3n+2) { --c: var(--tier-2); }
+.motif i:nth-child(3n) { --c: var(--tier-3); }
+.motif i:nth-child(n+4) { opacity: .5; }
+.motif i:nth-child(n+7) { opacity: .24; }
+
+/* ---------- tier chips ---------- */
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.chip {
+  display: inline-block; font-size: .78rem; font-weight: 700; letter-spacing: .03em;
+  padding: 3px 11px; border-radius: 999px; color: #0b0f14; background: var(--tier-3);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45);
+}
+.chip.t1 { background: var(--tier-1); }
+.chip.t2 { background: var(--tier-2); }
+.chip.t3 { background: var(--tier-3); }
+.chip.faded { background: rgba(255,255,255,.1); color: var(--muted); box-shadow: none; }
+
 /* ---------- header ---------- */
 
 .site-header { border-bottom: 1px solid var(--line); }
@@ -80,11 +111,11 @@ a:hover { text-decoration-thickness: 2px; }
   display: inline-flex; align-items: center; gap: 10px;
   font-weight: 700; font-size: 1.1rem; color: var(--text); text-decoration: none;
 }
-.brand img { width: 32px; height: 32px; border-radius: 8px; }
+.brand svg { width: 32px; height: 32px; flex: none; }
 .site-nav ul { display: flex; flex-wrap: wrap; gap: 4px 18px; list-style: none; margin: 0; padding: 0; }
 .site-nav a { color: var(--muted); text-decoration: none; font-size: .95rem; padding: 6px 0; display: inline-block; }
 .site-nav a:hover, .site-nav a[aria-current="page"] { color: var(--text); }
-.site-nav a[aria-current="page"] { font-weight: 600; }
+.site-nav a[aria-current="page"] { font-weight: 600; box-shadow: inset 0 -2px 0 var(--tier-2); }
 
 /* ---------- type ---------- */
 
@@ -100,25 +131,27 @@ p { margin: 0 0 14px; }
 /* ---------- sections ---------- */
 
 section { padding: 56px 0; }
-section.alt { background: var(--bg-alt); }
+section.alt { background: var(--alt); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .section-head { max-width: 46em; margin-bottom: 28px; }
-
-.tierbar { display: flex; gap: 6px; margin-bottom: 18px; }
-.tierbar span { width: 28px; height: 6px; border-radius: 3px; }
-.tierbar span:nth-child(1) { background: var(--tier-1); }
-.tierbar span:nth-child(2) { background: var(--tier-2); }
-.tierbar span:nth-child(3) { background: var(--tier-3); }
 
 /* ---------- hero ---------- */
 
 .hero { padding: 48px 0 40px; }
 .hero .wrap { display: grid; gap: 36px; align-items: center; }
+.hero-mark { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.app-icon { border-radius: 22.5%; box-shadow: 0 12px 30px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.12); }
+.hero-mark .app-icon, .hero-mark .motif { width: 88px; height: 88px; flex: none; }
 .pitch {
   display: inline-block; font-weight: 600; font-size: 1.1rem;
   border-left: 4px solid var(--tier-2); padding: 4px 0 4px 12px; margin: 4px 0 20px;
 }
-.hero-shots { display: flex; gap: 12px; justify-content: center; align-items: flex-end; }
-.hero-shots img { width: 31%; max-width: 230px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+.hero-art { position: relative; }
+.hero-art > .motif {
+  position: absolute; width: min(88%, 440px); left: 50%; top: 50%;
+  transform: translate(-50%, -50%) rotate(-6deg); opacity: .9;
+}
+.hero-shots { position: relative; display: flex; gap: 12px; justify-content: center; align-items: flex-end; }
+.hero-shots img { width: 31%; max-width: 230px; border-radius: 14px; box-shadow: 0 16px 40px rgba(0,0,0,.55); }
 .hero-shots img:nth-child(2) { transform: translateY(-18px); }
 .hero-shots.single img { width: 100%; max-width: 560px; transform: none; }
 
@@ -128,7 +161,8 @@ section.alt { background: var(--bg-alt); }
 
 .cta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 8px; }
 
-/* App Store badge: Apple's artwork, unmodified, min 40px tall, clear space around it */
+/* App Store badge: Apple's black artwork (with its gray border), unmodified,
+   min 40px tall, clear space around it */
 .badge { display: inline-block; padding: 10px 0; line-height: 0; }
 .badge img { height: 44px; width: auto; }
 
@@ -138,7 +172,7 @@ section.alt { background: var(--bg-alt); }
   display: grid; grid-auto-flow: column; grid-auto-columns: minmax(180px, 230px);
   gap: 16px; overflow-x: auto; padding: 4px 4px 16px; scroll-snap-type: x mandatory;
 }
-.shots img { border-radius: 12px; border: 1px solid var(--line); scroll-snap-align: start; }
+.shots img { border-radius: 14px; border: 1px solid var(--line); scroll-snap-align: start; }
 .shots .ipad { grid-column: span 2; }
 .shots figure { margin: 0; }
 
@@ -150,30 +184,41 @@ section.alt { background: var(--bg-alt); }
 @media (min-width: 640px) and (max-width: 899px) { .grid.four, .grid.three { grid-template-columns: 1fr 1fr; } }
 
 .card {
-  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--card); border: 1px solid var(--card-line); border-radius: var(--radius);
   padding: 20px; display: flex; flex-direction: column;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07);
 }
 .card h3 a { color: var(--text); text-decoration: none; }
 .card h3 a:hover { text-decoration: underline; }
-.card .card-icon { width: 72px; height: 72px; border-radius: 16px; margin-bottom: 14px; }.card .grow { flex: 1; }
+.card .app-icon, .card .motif { width: 72px; height: 72px; margin-bottom: 14px; }
+.card .motif { box-shadow: 0 12px 30px rgba(0,0,0,.45); }
+.card .grow { flex: 1; }
 .card .links { font-size: .95rem; margin: 6px 0 0; }
 .tag {
   display: inline-block; font-size: .8rem; font-weight: 600; letter-spacing: .02em;
-  padding: 3px 10px; border-radius: 999px; background: var(--bg-alt); color: var(--muted);
+  padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,.08); color: var(--muted);
   border: 1px solid var(--line); margin-bottom: 10px; align-self: flex-start;
+}
+
+/* sport cards on the home page carry their sport's tint */
+.card.theme-nfl, .card.theme-nba, .card.theme-nhl {
+  background: linear-gradient(180deg, var(--hi), var(--bg));
 }
 
 .features { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
 @media (min-width: 720px) { .features { grid-template-columns: 1fr 1fr; gap: 16px 32px; } }
-.features li { padding-left: 18px; position: relative; }
+.features li { padding-left: 24px; position: relative; }
 .features li::before {
-  content: ""; position: absolute; left: 0; top: .6em; width: 8px; height: 8px; border-radius: 2px; background: var(--tier-3);
+  content: ""; position: absolute; left: 0; top: .45em; width: 14px; height: 10px; border-radius: 3px;
+  background: linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 60%), var(--c, var(--tier-3));
 }
+.features li:nth-child(3n+1) { --c: var(--tier-1); }
+.features li:nth-child(3n+2) { --c: var(--tier-2); }
 .features strong { display: block; }
 
 /* ---------- pricing ---------- */
 
-.price-table { display: grid; gap: 18px; }
+.price-table { display: grid; gap: 18px; margin-bottom: 18px; }
 @media (min-width: 720px) { .price-table { grid-template-columns: 1fr 1fr; } }
 .price-table ul { margin: 0; padding-left: 20px; }
 .price-table li { margin-bottom: 6px; }
@@ -186,14 +231,18 @@ section.alt { background: var(--bg-alt); }
 /* ---------- signup ---------- */
 
 .signup-box {
-  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 24px; max-width: 640px;
+  background: var(--card); border: 1px solid var(--card-line); border-radius: var(--radius);
+  padding: 24px; max-width: 640px; position: relative; overflow: hidden;
+}
+.signup-box::before {
+  content: ""; position: absolute; inset: 0 0 auto; height: 4px;
+  background: linear-gradient(90deg, var(--tier-1) 0 33.3%, var(--tier-2) 33.3% 66.6%, var(--tier-3) 66.6%);
 }
 .signup-form { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
 .signup-form label.field { flex: 1 1 240px; display: flex; flex-direction: column; gap: 4px; font-size: .9rem; color: var(--muted); }
 .signup-form input[type="email"] {
-  font: inherit; color: var(--text); background: var(--bg);
-  border: 1px solid var(--muted); border-radius: 10px; padding: 11px 12px; min-height: 46px;
+  font: inherit; color: var(--text); background: rgba(0,0,0,.35);
+  border: 1px solid var(--field); border-radius: 10px; padding: 11px 12px; min-height: 46px;
 }
 .signup-form button {
   font: inherit; font-weight: 600; cursor: pointer; align-self: flex-end;
@@ -201,6 +250,7 @@ section.alt { background: var(--bg-alt); }
   padding: 11px 20px; min-height: 46px;
 }
 .signup-form button[disabled] { opacity: .6; cursor: progress; }
+.signup-form .cf-turnstile { flex-basis: 100%; min-height: 65px; }
 .hp { position: absolute !important; left: -10000px !important; width: 1px; height: 1px; overflow: hidden; }
 .signup-status { min-height: 1.5em; margin: 10px 0 0; font-weight: 500; }
 .signup-status.ok { color: var(--ok); }
@@ -210,7 +260,7 @@ section.alt { background: var(--bg-alt); }
 
 /* Signup right under the home hero, and inside the baseball hero */
 .signup-band { padding: 0 0 48px; }
-.signup-band .signup-box { max-width: 760px; border-left: 4px solid var(--tier-2); }
+.signup-band .signup-box { max-width: 760px; }
 .hero .signup-box { margin: 20px 0 12px; }
 
 /* ---------- footer ---------- */

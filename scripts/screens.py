@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Copy real App Store screenshots (assets/screens/) and app icons (assets/icons/,
-assets/icon-*.png) from the app repos at web size.
+"""Copy real App Store screenshots (assets/screens/) from the app repos at web size.
+App icons come from scripts/icons.py.
 
 Run from the repo root:  python3 scripts/screens.py
 Reads (never writes) ../DraftMatrix/apps/*/AppStore/. Output is committed, so the
@@ -47,29 +47,7 @@ SHOTS = {
 }
 
 
-# Real app icons (flat previews of each app's layered icon).
-ICONS = {
-    "nfl": "DraftBoard/Design/icon-layers/preview-flat.png",
-    "nba": "NBADraftMatrix/Design/icon-layers/preview-flat.png",
-    "nhl": "NHLDraftMatrix/Design/icon-layers/preview-flat.png",
-    "mlb": "MLBDraftMatrix/Design/icon-layers/preview-flat.png",
-}
-
-
-def icons():
-    out = ROOT / "assets" / "icons"
-    out.mkdir(parents=True, exist_ok=True)
-    for sport, rel in ICONS.items():
-        im = Image.open(APPS / rel).convert("RGB")
-        im.resize((256, 256), Image.LANCZOS).save(out / f"{sport}-256.png", optimize=True)
-    # Site favicon / touch icon: the football app's icon (the family's first app).
-    flat = Image.open(APPS / ICONS["nfl"]).convert("RGB")
-    for size in (64, 180):
-        flat.resize((size, size), Image.LANCZOS).save(ROOT / "assets" / f"icon-{size}.png", optimize=True)
-
-
 def main():
-    icons()
     OUT.mkdir(parents=True, exist_ok=True)
     for name, rel in SHOTS.items():
         im = Image.open(APPS / rel).convert("RGB")

@@ -10,6 +10,8 @@
 //   index.html.
 // - src/_worker.js becomes dist/_worker.js (Pages advanced mode) and handles
 //   /api/subscribe and /api/feedback. There is no functions/ directory.
+// - Both forms carry a Turnstile widget; the Turnstile script is added only to
+//   pages that have a form.
 
 import { cpSync, copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -26,6 +28,11 @@ const SUPPORT_EMAIL = null;
 // Where signups and feedback are stored, as named on the privacy pages.
 const PROVIDER = "Cloudflare, our website host";
 
+// Cloudflare Turnstile public sitekey (managed widget) for both forms. Public by
+// design; the matching secret is TURNSTILE_SECRET in the Pages project settings.
+const TURNSTILE_SITEKEY = "0x4AAAAAAFjE4WGiG4z1Gaww";
+const TURNSTILE_SCRIPT = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const DIST = join(ROOT, "dist");
 const ORIGIN = "https://draftmatrix.app";
@@ -36,6 +43,9 @@ const APP_STORE = {
   nba: "https://apps.apple.com/us/app/id6814882709",
   nhl: "https://apps.apple.com/us/app/id6811083062",
 };
+
+// <meta name="theme-color"> per page tint (the darker end of each gradient).
+const THEME_COLOR = { brand: "#0b0f14", nfl: "#07170d", nba: "#130e08", nhl: "#071019" };
 
 const APP_NAME = {
   nfl: "DraftMatrix: Fantasy Football",
@@ -84,6 +94,8 @@ const PAGES = [
     description:
       "A live, tiered draft board for in-person fantasy drafts: football, hoops and hockey, with baseball coming. Free to download; DraftMatrix Pro is a one-time purchase.",
     og: "default",
+    theme: "brand",
+    icon: "nfl",
   },
   {
     src: "nfl.html",
@@ -94,6 +106,8 @@ const PAGES = [
     description:
       "A fantasy football draft board built on tier rankings, with PPR, Half PPR and Standard scoring, a pick clock, keepers and targets. Works for in-person drafts.",
     og: "nfl",
+    theme: "nfl",
+    icon: "nfl",
   },
   {
     src: "nba.html",
@@ -104,6 +118,8 @@ const PAGES = [
     description:
       "A fantasy basketball draft board with tiers per position, Categories or Points scoring, roster needs and a draft clock. Built for in-person drafts.",
     og: "nba",
+    theme: "nba",
+    icon: "nba",
   },
   {
     src: "nhl.html",
@@ -114,6 +130,8 @@ const PAGES = [
     description:
       "A fantasy hockey draft board with tiers for centers, wings, defense and goalies, roster needs and a draft clock. Built for in-person drafts.",
     og: "nhl",
+    theme: "nhl",
+    icon: "nhl",
   },
   {
     src: "mlb.html",
@@ -124,6 +142,8 @@ const PAGES = [
     description:
       "DraftMatrix: Fantasy Baseball is coming in February 2027: a tiered fantasy baseball draft board for iPhone and iPad. Get the free cheat sheet each draft season.",
     og: "mlb",
+    theme: "brand",
+    icon: "nfl", // baseball has no released app icon; uses the brand-level favicon
   },
 ];
 
@@ -147,12 +167,46 @@ const NAV = [
 const esc = (s) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+// The site is dark, so it always uses Apple's black badge, which carries its own
+// gray border for dark backgrounds. One badge per app card.
 function badge(sport) {
   const name = APP_NAME[sport];
   return `<a class="badge" href="${APP_STORE[sport]}" aria-label="Download ${esc(name)} on the App Store">` +
-    `<picture><source srcset="/assets/badges/app-store-white.svg" media="(prefers-color-scheme: dark)">` +
-    `<img src="/assets/badges/app-store-black.svg" alt="Download on the App Store" width="132" height="44"></picture></a>`;
+    `<img src="/assets/badges/app-store-black.svg" alt="Download on the App Store" width="132" height="44"></a>`;
 }
+
+// A real app icon (football, hoops and hockey only), webp with a png fallback.
+// Decorative: the app's name is always in the heading next to it.
+function icon(sport, px, lazy) {
+  if (!APP_STORE[sport]) throw new Error(`no released app icon for ${sport}`);
+  const base = `/assets/icons/${sport}`;
+  return `<picture><source type="image/webp" srcset="${base}-128.webp 128w, ${base}-256.webp 256w, ${base}-512.webp 512w" sizes="${px}px">` +
+    `<img class="app-icon" src="${base}-256.png" width="${px}" height="${px}" alt=""${lazy ? ' loading="lazy"' : ""}></picture>`;
+}
+
+// The brand tile pattern: a 3x3 grid, top row pink / green / blue, lower rows
+// fading. A generic brand decoration, not an app icon.
+const MOTIF = `<div class="motif" aria-hidden="true">${"<i></i>".repeat(9)}</div>`;
+
+// The same pattern as a small SVG, next to the wordmark in the header.
+function mark() {
+  const colors = ["#ff5e7d", "#3fde9b", "#4eb9ff"];
+  const tiles = [];
+  [1, 0.5, 0.24].forEach((opacity, row) => colors.forEach((fill, col) => {
+    const x = 10 + col * 15.5, y = 15 + row * 13;
+    tiles.push(`<g opacity="${opacity}"><rect x="${x}" y="${y}" width="13" height="9" rx="3" fill="${fill}"/>` +
+      `<rect x="${x}" y="${y}" width="13" height="9" rx="3" fill="url(#dm-gloss)"/></g>`);
+  }));
+  return `<svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true" focusable="false">` +
+    `<defs><linearGradient id="dm-gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".45"/>` +
+    `<stop offset=".55" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>` +
+    `<rect x="1" y="1" width="62" height="62" rx="15" fill="#1d2430" stroke="#fff" stroke-opacity=".25"/>` +
+    tiles.join("") + `</svg>`;
+}
+
+// Managed Turnstile widget. Its script is added only to pages that have one.
+const turnstile = (theme) =>
+  `<div class="cf-turnstile" data-sitekey="${TURNSTILE_SITEKEY}" data-theme="${theme}"></div>`;
 
 let signupCount = 0;
 function signup(sport, heading = "Get the free cheat sheet each draft season") {
@@ -171,6 +225,7 @@ function signup(sport, heading = "Get the free cheat sheet each draft season") {
       </div>
       <input type="hidden" name="sport" value="${sport}">
       <button type="submit">Sign up</button>
+      ${turnstile("dark")}
     </form>
     <p class="signup-status" role="status" aria-live="polite"></p>
     <p class="signup-note">Signing up is optional, and you can unsubscribe anytime. We only use your email for DraftMatrix emails. <a href="${PRIVACY[sport]}#email-list">Privacy</a></p>${note}
@@ -198,6 +253,7 @@ const ADDED_CSS = `<style>
     background: #0a5bd6; color: #fff; border: 0; border-radius: 10px; padding: 11px 20px; min-height: 46px;
   }
   .dm-added button[disabled] { opacity: .6; cursor: progress; }
+  .dm-added .cf-turnstile { margin-top: 16px; min-height: 65px; }
   .dm-added .dm-hp { position: absolute !important; left: -10000px !important; width: 1px; height: 1px; overflow: hidden; }
   .dm-added .dm-status { min-height: 1.5em; margin: 10px 0 0; font-weight: 500; }
   .dm-added .dm-status.ok { color: #157a46; }
@@ -239,24 +295,29 @@ ${reach}
     <label for="dm-company">Company (leave blank)</label>
     <input id="dm-company" name="company" type="text" tabindex="-1" autocomplete="off">
   </div>
+  ${turnstile("auto")}
   <button type="submit">Send</button>
   <p class="dm-status" role="status" aria-live="polite"></p>
 </form>
 </section>
+<script src="${TURNSTILE_SCRIPT}" async defer></script>
 <script src="/assets/feedback.js" defer></script>`;
 }
 
+// Must list exactly the fields src/_worker.js stores (see CLAIMS.md).
 function privacySection(support) {
   return `<section class="dm-added" aria-labelledby="email-list">
 <style>
   .dm-added { margin-top: 2.5rem; padding-top: .5rem; border-top: 1px solid #c7c7cc; }
   @media (prefers-color-scheme: dark) { .dm-added { border-top-color: #3a3a3c; } }
 </style>
-<h2 id="email-list">Email list and feedback form (added October 2026)</h2>
-<p>This section covers the draftmatrix.app website only. The apps themselves still collect no data.</p>
-<p><strong>Email list.</strong> If you join the email list, we collect only your email address, which sport pages you signed up from, and when you first and most recently signed up. We use it only to send the draft-season cheat sheet and DraftMatrix app news. You can unsubscribe anytime: every email will have an unsubscribe link, or you can ask us to remove you through the <a href="${support}">support page</a>.</p>
-<p><strong>Feedback form.</strong> If you send feedback, we receive the name (optional), email address and message you send, the app you pick, the time you sent it, and your browser's user-agent string. We use them only to reply to you.</p>
-<p>Both are stored with ${esc(PROVIDER)}. We never sell or share your email address or messages.</p>
+<h2 id="email-list">Website email list and feedback form</h2>
+<p><em>Added October 23, 2026</em></p>
+<p>The DraftMatrix apps themselves still collect no data. This section covers only the optional forms on the draftmatrix.app website.</p>
+<p><strong>Email list.</strong> If you sign up, we store your email address, which sport page(s) you signed up from, and when you first and most recently signed up. We use it only to send the draft-season cheat sheet and DraftMatrix app news.</p>
+<p><strong>Feedback form.</strong> If you send feedback, we store your name (optional), your email address, the app you chose, your message, and the time you sent it. We use it only to reply to you.</p>
+<p>Both are stored with ${esc(PROVIDER)}, and kept until you unsubscribe or ask us to delete them. You can unsubscribe anytime, or ask for deletion through the <a href="${support}">support page</a>. We never sell or share them.</p>
+<p>To block spam, the forms use Cloudflare Turnstile, which checks your browser when you submit; see <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's privacy policy</a>.</p>
 </section>`;
 }
 
@@ -275,7 +336,7 @@ function header(current) {
   return `<a class="skip" href="#main">Skip to content</a>
 <header class="site-header">
   <div class="wrap">
-    <a class="brand" href="/"${current === "home" ? ' aria-current="page"' : ""}><img src="/assets/icon-64.png" alt="" width="32" height="32">DraftMatrix</a>
+    <a class="brand" href="/"${current === "home" ? ' aria-current="page"' : ""}>${mark()}DraftMatrix</a>
     <nav class="site-nav" aria-label="Main"><ul>${links}</ul></nav>
   </div>
 </header>`;
@@ -310,9 +371,10 @@ function layout(page, body) {
 <title>${esc(page.title)}</title>
 <meta name="description" content="${esc(page.description)}">
 <link rel="canonical" href="${url}">
-<meta name="color-scheme" content="light dark">
-<link rel="icon" href="/assets/icon-64.png" type="image/png" sizes="64x64">
-<link rel="apple-touch-icon" href="/assets/icon-180.png">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="${THEME_COLOR[page.theme]}">
+<link rel="icon" href="/assets/icons/${page.icon}-64.png" type="image/png" sizes="64x64">
+<link rel="apple-touch-icon" href="/assets/icons/${page.icon}-180.png">
 <link rel="stylesheet" href="/assets/site.css">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="DraftMatrix">
@@ -327,8 +389,8 @@ function layout(page, body) {
 <meta name="twitter:title" content="${esc(page.title)}">
 <meta name="twitter:description" content="${esc(page.description)}">
 <meta name="twitter:image" content="${og}">
-</head>
-<body>
+${body.includes("cf-turnstile") ? `<script src="${TURNSTILE_SCRIPT}" async defer></script>\n` : ""}</head>
+<body class="theme-${page.theme}">
 ${header(page.nav)}
 <main id="main">
 ${body.trim()}
@@ -341,9 +403,12 @@ ${footer()}
 }
 
 // {{badge:nfl}}  {{signup:nba}}  {{signup:all|Custom heading}}  {{name:nhl}}  {{store:nba}}
+// {{icon:nfl|88}}  {{icon:nba|72|lazy}}  {{motif:brand}}
 function expand(src) {
   return src.replace(/\{\{(\w+):(\w+)(?:\|([^}]*))?\}\}/g, (m, kind, arg, extra) => {
     if (kind === "badge") return badge(arg);
+    if (kind === "icon") return icon(arg, ...(extra ?? "").split("|"));
+    if (kind === "motif") return MOTIF;
     if (kind === "signup") return signup(arg, extra);
     if (kind === "name") return esc(APP_NAME[arg]);
     if (kind === "store") return APP_STORE[arg];

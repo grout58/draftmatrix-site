@@ -1,10 +1,27 @@
-// Runs dist/_worker.js in Node against fake KV and ASSETS bindings.
+// Runs dist/_worker.js in Node against fake KV and ASSETS bindings, with a
+// mocked fetch standing in for Turnstile's siteverify endpoint.
 // Called by scripts/check.py; also runnable alone: `node scripts/worker-test.mjs`.
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const worker = (await import(pathToFileURL(join(ROOT, "dist", "_worker.js")))).default;
+
+// ---- mocked siteverify: only GOOD passes; DOWN makes the endpoint fail ----
+const SECRET = "test-secret";
+const GOOD = "good-token";
+const DOWN = "siteverify-down";
+const verifyCalls = [];
+globalThis.fetch = async (url, init = {}) => {
+  if (url !== "https://challenges.cloudflare.com/turnstile/v0/siteverify") {
+    throw new Error(`unexpected fetch ${url}`);
+  }
+  const form = new URLSearchParams(init.body);
+  verifyCalls.push({ method: init.method, form });
+  if (form.get("response") === DOWN) return new Response("error", { status: 500 });
+  const success = form.get("secret") === SECRET && form.get("response") === GOOD;
+  return Response.json({ success, "error-codes": success ? [] : ["invalid-input-response"] });
+};
 
 class FakeKV {
   constructor() { this.map = new Map(); }
@@ -27,11 +44,12 @@ function check(name, cond, detail = "") {
   if (!cond) failures++;
 }
 
+// JSON bodies get a valid Turnstile token unless they set their own.
 function post(path, body, { headers = {}, raw } = {}) {
   return new Request(HOST + path, {
     method: "POST",
     headers: { "content-type": "application/json", origin: HOST, ...headers },
-    body: raw ?? JSON.stringify(body),
+    body: raw ?? JSON.stringify(body && { turnstileToken: GOOD, ...body }),
   });
 }
 
@@ -54,18 +72,67 @@ async function call(request, env) {
   }
 }
 
-// ---- missing bindings -> 503 ----
+// ---- missing bindings or secret -> 503 ----
 {
-  const env = { ASSETS };
+  let env = { ASSETS, TURNSTILE_SECRET: SECRET };
   let r = await call(post("/api/subscribe", { email: "a@example.com", sport: "nfl" }), env);
   check("subscribe without SIGNUPS -> 503", r.status === 503 && r.body.ok === false);
   r = await call(post("/api/feedback", { email: "a@example.com", message: "hi", app: "hockey" }), env);
   check("feedback without FEEDBACK -> 503", r.status === 503 && r.body.ok === false);
+
+  env = { ASSETS, SIGNUPS: new FakeKV(), FEEDBACK: new FakeKV() };
+  const before = verifyCalls.length;
+  r = await call(post("/api/subscribe", { email: "a@example.com", sport: "nfl" }), env);
+  check("subscribe without TURNSTILE_SECRET -> 503 not live",
+    r.status === 503 && r.body.reason === "not live" && env.SIGNUPS.map.size === 0);
+  r = await call(post("/api/feedback", { email: "a@example.com", message: "hi" }), env);
+  check("feedback without TURNSTILE_SECRET -> 503 not live",
+    r.status === 503 && r.body.reason === "not live" && env.FEEDBACK.map.size === 0);
+  check("no siteverify call without a secret", verifyCalls.length === before);
+}
+
+// ---- Turnstile ----
+{
+  const env = { ASSETS, SIGNUPS: new FakeKV(), FEEDBACK: new FakeKV(), TURNSTILE_SECRET: SECRET };
+  for (const path of ["/api/subscribe", "/api/feedback"]) {
+    const body = { email: "t@example.com", message: "hi" };
+    let before = verifyCalls.length;
+    let r = await call(post(path, { ...body, turnstileToken: "bad-token" }), env);
+    check(`${path} bad token -> 403 verification failed`,
+      r.status === 403 && r.body.ok === false && r.body.reason === "verification failed" &&
+      verifyCalls.length === before + 1, JSON.stringify(r.body));
+
+    before = verifyCalls.length;
+    r = await call(post(path, { ...body, turnstileToken: "" }), env);
+    check(`${path} empty token -> 403 without calling siteverify`,
+      r.status === 403 && r.body.reason === "verification failed" && verifyCalls.length === before);
+    r = await call(post(path, { ...body, turnstileToken: undefined }), env);
+    check(`${path} missing token -> 403`, r.status === 403 && verifyCalls.length === before);
+    r = await call(post(path, { ...body, turnstileToken: "x".repeat(2049) }), env);
+    check(`${path} oversized token -> 403`, r.status === 403 && verifyCalls.length === before);
+
+    r = await call(post(path, { ...body, turnstileToken: DOWN }), env);
+    check(`${path} siteverify outage -> 502, not a false success`, r.status === 502 && r.body.ok === false);
+  }
+  check("nothing stored after failed verification", env.SIGNUPS.map.size === 0 && env.FEEDBACK.map.size === 0);
+
+  const before = verifyCalls.length;
+  const r = await call(post("/api/subscribe", { email: "ok@example.com" },
+    { headers: { "cf-connecting-ip": "203.0.113.7" } }), env);
+  const sent = verifyCalls[before];
+  check("good token -> stored", r.status === 200 && env.SIGNUPS.map.has("email:ok@example.com"));
+  check("siteverify gets POST secret, response, remoteip (form-encoded)",
+    sent?.method === "POST" && sent.form.get("secret") === SECRET && sent.form.get("response") === GOOD &&
+    sent.form.get("remoteip") === "203.0.113.7");
+
+  const hp = verifyCalls.length;
+  await call(post("/api/subscribe", { email: "bot@example.com", company: "Acme", turnstileToken: "" }), env);
+  check("honeypot short-circuits before siteverify", verifyCalls.length === hp && !env.SIGNUPS.map.has("email:bot@example.com"));
 }
 
 // ---- method and origin ----
 {
-  const env = { ASSETS, SIGNUPS: new FakeKV(), FEEDBACK: new FakeKV() };
+  const env = { ASSETS, SIGNUPS: new FakeKV(), FEEDBACK: new FakeKV(), TURNSTILE_SECRET: SECRET };
   for (const method of ["GET", "PUT", "DELETE"]) {
     for (const path of ["/api/subscribe", "/api/feedback", "/api/other"]) {
       const r = await call(new Request(HOST + path, { method }), env);
@@ -80,7 +147,7 @@ async function call(request, env) {
   check("Origin: null -> 403", r.status === 403);
   const noOrigin = new Request(HOST + "/api/subscribe", {
     method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "noorigin@example.com", sport: "nba" }),
+    body: JSON.stringify({ email: "noorigin@example.com", sport: "nba", turnstileToken: GOOD }),
   });
   r = await call(noOrigin, env);
   check("POST without Origin header is allowed", r.status === 200 && r.body.ok === true);
@@ -89,7 +156,7 @@ async function call(request, env) {
 // ---- subscribe ----
 {
   const SIGNUPS = new FakeKV();
-  const env = { ASSETS, SIGNUPS };
+  const env = { ASSETS, SIGNUPS, TURNSTILE_SECRET: SECRET };
   let r = await call(post("/api/subscribe", { email: "not-an-email", sport: "nfl" }), env);
   check("subscribe bad email -> 400", r.status === 400 && SIGNUPS.map.size === 0);
   r = await call(post("/api/subscribe", null, { raw: "{" }), env);
@@ -102,6 +169,8 @@ async function call(request, env) {
   check("subscribe stores lowercased key", r.status === 200 && r.body.ok === true && first?.sport === "nfl");
   check("subscribe record has sports/ts/firstTs",
     JSON.stringify(first?.sports) === '["nfl"]' && typeof first?.ts === "string" && first?.firstTs === first?.ts);
+  check("signup record is exactly {sport, sports, ts, firstTs}",
+    Object.keys(first ?? {}).sort().join() === "firstTs,sport,sports,ts", JSON.stringify(first));
 
   await new Promise((done) => setTimeout(done, 5));
   await call(post("/api/subscribe", { email: "fan@example.com", sport: "mlb" }), env);
@@ -122,7 +191,7 @@ async function call(request, env) {
 
   const form = new Request(HOST + "/api/subscribe", {
     method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", origin: HOST },
-    body: "email=form%40example.com&sport=nhl&company=",
+    body: `email=form%40example.com&sport=nhl&company=&turnstileToken=${GOOD}`,
   });
   r = await call(form, env);
   check("form-encoded subscribe works", r.status === 200 && SIGNUPS.map.has("email:form@example.com"));
@@ -131,7 +200,7 @@ async function call(request, env) {
 // ---- feedback ----
 {
   const FEEDBACK = new FakeKV();
-  const env = { ASSETS, FEEDBACK };
+  const env = { ASSETS, FEEDBACK, TURNSTILE_SECRET: SECRET };
   const good = { name: "Sam", email: "Sam@Example.com", app: "hoops", message: "Love it", company: "" };
   let r = await call(post("/api/feedback", { ...good, email: "" }), env);
   check("feedback without email -> 400", r.status === 400);
@@ -150,9 +219,9 @@ async function call(request, env) {
   check("feedback -> 200 {ok:true}", r.status === 200 && r.body.ok === true);
   check("feedback key is fb:<ISO ts>:<random>", keys.every((k) => /^fb:\d{4}-\d\d-\d\dT[\d:.]+Z:[0-9a-f]{8}$/.test(k)), keys.join(","));
   check("feedback keys are unique", new Set(keys).size === keys.length);
-  check("feedback record fields",
+  check("feedback record is exactly {name, email, app, message, ts} (no user-agent)",
     rec.name === "Sam" && rec.email === "sam@example.com" && rec.app === "hoops" && rec.message === "Love it" &&
-    rec.ua === "TestUA/1.0" && typeof rec.ts === "string", JSON.stringify(rec));
+    typeof rec.ts === "string" && Object.keys(rec).sort().join() === "app,email,message,name,ts", JSON.stringify(rec));
   await call(post("/api/feedback", { email: "a@example.com", message: "m", app: "nope" }), env);
   const last = JSON.parse([...FEEDBACK.map.values()].at(-1));
   check("feedback: optional name, unknown app -> other", last.name === "" && last.app === "other", JSON.stringify(last));
@@ -161,7 +230,7 @@ async function call(request, env) {
 // ---- storage failure -> 500, not a false success ----
 {
   const broken = { async get() { throw new Error("down"); }, async put() { throw new Error("down"); } };
-  const r = await call(post("/api/subscribe", { email: "a@example.com" }), { ASSETS, SIGNUPS: broken });
+  const r = await call(post("/api/subscribe", { email: "a@example.com" }), { ASSETS, SIGNUPS: broken, TURNSTILE_SECRET: SECRET });
   check("KV error -> 500", r.status === 500 && r.body.ok === false);
 }
 

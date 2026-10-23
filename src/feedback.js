@@ -1,5 +1,6 @@
-// Feedback form on the support pages: posts {name, email, app, message, company}
-// to /api/feedback. Only a 200 with {ok:true} counts as success.
+// Feedback form on the support pages: posts {name, email, app, message, company,
+// turnstileToken} to /api/feedback. Only a 200 with {ok:true} counts as success.
+// The Turnstile widget is reset after every submit (tokens are single-use).
 (function () {
   var MESSAGES = {
     ok: "Thanks. Your message was sent, and we'll reply by email.",
@@ -7,6 +8,7 @@
     email: "Please enter a valid email address.",
     message: "Please enter a message.",
     tooLong: "Please keep your message under 4,000 characters.",
+    human: "Couldn't verify you're human — please try again.",
     failed: "Something went wrong and your message wasn't sent. Please try again later, or use the contact link above.",
   };
 
@@ -15,9 +17,21 @@
     el.className = "dm-status " + kind;
   }
 
+  // Turnstile adds a hidden cf-turnstile-response input inside its container.
+  function token(widget) {
+    var input = widget && widget.querySelector('input[name="cf-turnstile-response"]');
+    return input ? input.value : "";
+  }
+
+  function reset(widget) {
+    if (!widget || !window.turnstile) return;
+    try { window.turnstile.reset(widget); } catch (e) { /* widget not rendered */ }
+  }
+
   document.querySelectorAll("form.dm-feedback").forEach(function (form) {
     var status = form.querySelector(".dm-status");
     var button = form.querySelector("button");
+    var widget = form.querySelector(".cf-turnstile");
     var f = form.elements;
 
     form.addEventListener("submit", function (event) {
@@ -52,6 +66,7 @@
           app: f.app.value,
           message: message,
           company: f.company.value,
+          turnstileToken: token(widget),
         }),
       })
         .then(function (res) {
@@ -61,6 +76,8 @@
               form.reset();
             } else if (res.status === 503) {
               show(status, MESSAGES.notLive, "warn");
+            } else if (res.status === 403 && body.reason === "verification failed") {
+              show(status, MESSAGES.human, "err");
             } else {
               show(status, MESSAGES.failed, "err");
             }
@@ -70,6 +87,7 @@
           show(status, MESSAGES.failed, "err");
         })
         .then(function () {
+          reset(widget);
           button.disabled = false;
         });
     });
