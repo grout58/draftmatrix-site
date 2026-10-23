@@ -33,7 +33,7 @@ const SIGNUP_LIVE = true;
 // BUTTONDOWN_ENABLED="true" on the Pages project; see DEPLOY.md). It only changes
 // copy: the privacy pages then name Buttondown, and the signup success message
 // asks people to confirm by email. While false, the output is as before.
-const BUTTONDOWN_LIVE = false;
+const BUTTONDOWN_LIVE = true;
 const BUTTONDOWN_PRIVACY = "https://buttondown.com/legal/privacy";
 // scripts/check.py also builds with Buttondown on, into a temp dir: DM_BUTTONDOWN_LIVE=1
 // counts only together with DM_DIST (the output directory), so it never changes dist/.
