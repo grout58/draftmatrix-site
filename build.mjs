@@ -2,18 +2,19 @@
 //
 // - New pages live in src/pages/*.html (body content only). This script wraps
 //   each one in the shared head, header and footer.
-// - Legacy pages at the repo root are copied unchanged, except that the four
-//   support pages get a "Contact us" + feedback section and the four privacy
-//   pages get an email-list section, each between <!-- dm-added:start --> and
-//   <!-- dm-added:end --> just before the closing footer lines. The old
-//   index.html (football support) becomes support.html; the new home page is
-//   index.html.
+// - The support page (src/pages/support.html) is built four times: support.html
+//   for all apps, and hockey.html, basketball.html and baseball.html (the old
+//   per-sport support URLs) with that app first, its Smart App Banner and the
+//   feedback form preselected. The root index.html, hockey.html, basketball.html
+//   and baseball.html (the old support pages) are no longer copied into dist/;
+//   they stay at the repo root for the GitHub Pages copy of the site.
+// - The four legacy privacy pages at the repo root are copied unchanged, except
+//   for an email-list section between <!-- dm-added:start --> and
+//   <!-- dm-added:end --> just before the closing lines.
 // - Small inline edits, each wrapped in <!-- dm-inline:start --> and
 //   <!-- dm-inline:end --> on one line: each privacy page's Contact sentence is
 //   replaced by one naming only the support email and support page (no GitHub),
-//   the motif favicon links go just before </head> on baseball.html and
-//   baseball-privacy.html, and the Smart App Banner meta goes after the viewport
-//   meta on the football, hoops and hockey support pages.
+//   and the motif favicon links go just before </head> on baseball-privacy.html.
 // - src/_worker.js becomes dist/_worker.js (Pages advanced mode) and handles
 //   /api/subscribe and /api/feedback. There is no functions/ directory.
 // - Both forms carry a Turnstile widget; the Turnstile script is added only to
@@ -43,9 +44,8 @@ const BUTTONDOWN = BUTTONDOWN_LIVE || (!!process.env.DM_DIST && process.env.DM_B
 const SIGNUP_OK = `ok: "Thanks. You're on the list for the cheat sheet."`;
 const SIGNUP_OK_CONFIRM = `ok: "Thanks. Check your inbox and confirm your email to get on the list for the cheat sheet."`;
 
-// Support email: the primary contact in the "Contact us" sections, and added to
-// the privacy pages' Contact line and deletion sentence. If set to null, those
-// fall back to GitHub and the feedback form, and the build warns.
+// Support email: the contact on the support pages, and added to the privacy
+// pages' Contact line and deletion sentence. Required.
 const SUPPORT_EMAIL = "support@draftmatrix.app";
 
 // Where signups and feedback are stored, as named on the privacy pages.
@@ -84,17 +84,44 @@ const APP_NAME = {
   mlb: "DraftMatrix: Fantasy Baseball",
 };
 
-// Legacy files: source at the repo root -> path in dist. The sources are never
-// edited; `add` names the section injected into the dist copy.
+// X account for twitter:site on every new page.
+const TWITTER_SITE = "@DraftMatrixApp";
+
+// JSON-LD per page path: WebSite on the home page, SoftwareApplication on the
+// three released apps' pages. Free to download (Pro is an in-app purchase), so
+// the offer is 0 USD. No ratings or review counts. No baseball (not released).
+const appLd = (sport) => ({
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: APP_NAME[sport],
+  operatingSystem: "iOS",
+  applicationCategory: "SportsApplication",
+  url: `https://apps.apple.com/app/id${APP_STORE[sport].match(/\/id(\d+)$/)[1]}`,
+  image: `${ORIGIN}/assets/icons/${sport}-512.png`,
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+});
+const STRUCTURED_DATA = {
+  "/": { "@context": "https://schema.org", "@type": "WebSite", name: "DraftMatrix", url: `${ORIGIN}/` },
+  "/nfl/": appLd("nfl"),
+  "/nba/": appLd("nba"),
+  "/nhl/": appLd("nhl"),
+};
+// "<" escaped so the JSON can't close the <script> early.
+const jsonLd = (data) =>
+  `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>\n`;
+
+// dist/_headers: image folders under /assets/ and their browser cache lifetime (7 days).
+const IMAGE_DIRS = ["screens", "icons", "og", "badges"];
+const IMAGE_MAX_AGE = 604800;
+
+// Legacy privacy pages: source at the repo root -> path in dist. The sources are
+// never edited; the dist copy gets the email-list section. `support` is the
+// support page its Contact line links to (relative, like the legacy links).
 const LEGACY = {
-  "index.html": { out: "support.html", add: "contact", app: "football", appId: "nfl" },
-  "privacy.html": { out: "privacy.html", add: "privacy", support: "support.html" },
-  "hockey.html": { out: "hockey.html", add: "contact", app: "hockey", appId: "nhl" },
-  "hockey-privacy.html": { out: "hockey-privacy.html", add: "privacy", support: "hockey.html" },
-  "basketball.html": { out: "basketball.html", add: "contact", app: "hoops", appId: "nba" },
-  "basketball-privacy.html": { out: "basketball-privacy.html", add: "privacy", support: "basketball.html" },
-  "baseball.html": { out: "baseball.html", add: "contact", app: "baseball", icon: "motif" },
-  "baseball-privacy.html": { out: "baseball-privacy.html", add: "privacy", support: "baseball.html", icon: "motif" },
+  "privacy.html": { out: "privacy.html", support: "support.html" },
+  "hockey-privacy.html": { out: "hockey-privacy.html", support: "hockey.html" },
+  "basketball-privacy.html": { out: "basketball-privacy.html", support: "basketball.html" },
+  "baseball-privacy.html": { out: "baseball-privacy.html", support: "baseball.html", icon: "motif" },
 };
 
 // Privacy page whose email-list section each signup form links to.
@@ -106,6 +133,11 @@ const PRIVACY = {
   mlb: "/baseball-privacy.html",
 };
 
+// Each app's section id on the support page.
+const SUPPORT_ANCHOR = { nfl: "football", nba: "hoops", nhl: "hockey", mlb: "baseball" };
+
+// Feedback form "App" values (src/_worker.js accepts these) per sport key.
+const FEEDBACK_APP = { nfl: "football", nba: "hoops", nhl: "hockey", mlb: "baseball" };
 const FEEDBACK_APPS = [
   ["football", "Fantasy Football"],
   ["hoops", "Fantasy Hoops"],
@@ -179,6 +211,46 @@ const PAGES = [
     theme: "brand",
     icon: "motif", // baseball has no released app icon; the tile motif (scripts/motif_icon.py)
   },
+  // The support page, for all apps. /support is the App Store support URL for
+  // all three apps; its Smart App Banner stays the football one, as before.
+  {
+    src: "support.html",
+    out: "support.html",
+    path: "/support",
+    nav: "support",
+    focus: null,
+    title: "DraftMatrix Support — help for the football, hoops and hockey draft boards",
+    description:
+      "Help for DraftMatrix: Fantasy Football, Fantasy Hoops and Fantasy Hockey on iPhone and iPad: restoring Pro, the Lock Screen draft clock, offline drafting, iCloud sync and how to reach us.",
+    og: "default",
+    ogAlt: "DraftMatrix",
+    theme: "brand",
+    icon: "nfl",
+    appId: "nfl",
+  },
+  // The old per-sport support URLs (the 2.0.2 listings link to them): the same
+  // page with that app first. Canonical is /support, so they stay out of the sitemap.
+  ...[
+    ["hockey.html", "nhl", "nhl", "nhl", "nhl"],
+    ["basketball.html", "nba", "nba", "nba", "nba"],
+    ["baseball.html", "mlb", "brand", "motif", null],
+  ].map(([out, sport, theme, icon, appId]) => ({
+    src: "support.html",
+    out,
+    path: "/" + out.slice(0, -".html".length),
+    canonical: "/support",
+    nav: "support",
+    focus: sport,
+    title: `${APP_NAME[sport]} Support`,
+    description: sport === "mlb"
+      ? "Support for DraftMatrix: Fantasy Baseball, coming January 2027, and for the DraftMatrix football, hoops and hockey apps on iPhone and iPad."
+      : `Help for ${APP_NAME[sport]} on iPhone and iPad: restoring Pro, the Lock Screen draft clock, offline drafting, iCloud sync and how to reach us.`,
+    og: sport,
+    ogAlt: APP_NAME[sport],
+    theme,
+    icon,
+    appId,
+  })),
 ];
 
 // Pages serves dist/404.html, with status 404, for any path it has no file for.
@@ -199,19 +271,14 @@ const NOT_FOUND = {
 
 // Legacy pages listed in the sitemap, at the URLs Pages serves them on
 // (Pages drops .html and redirects to the bare path).
-const SITEMAP_LEGACY = [
-  "/support", "/privacy",
-  "/hockey", "/hockey-privacy",
-  "/basketball", "/basketball-privacy",
-  "/baseball", "/baseball-privacy",
-];
+const SITEMAP_LEGACY = ["/privacy", "/hockey-privacy", "/basketball-privacy", "/baseball-privacy"];
 
 const NAV = [
   ["nfl", "/nfl/", "Football"],
   ["nba", "/nba/", "Hoops"],
   ["nhl", "/nhl/", "Hockey"],
   ["mlb", "/mlb/", "Baseball"],
-  ["support", "/support.html", "Support"],
+  ["support", "/support", "Support"],
 ];
 
 const esc = (s) =>
@@ -287,71 +354,31 @@ function signup(sport, heading = "Get the free cheat sheet each draft season") {
 const ADDED_START = "<!-- dm-added:start -->";
 const ADDED_END = "<!-- dm-added:end -->";
 
-// Self-contained styles, scoped to .dm-added so the legacy page look is untouched.
-const ADDED_CSS = `<style>
-  .dm-added { color-scheme: light dark; margin-top: 2.5rem; padding-top: .5rem; border-top: 1px solid #c7c7cc; }
-  .dm-added form { margin-top: 1rem; }
-  .dm-added label { display: block; margin-top: 14px; font-weight: 600; font-size: .95rem; }
-  .dm-added label span { font-weight: 400; color: #6e6e73; }
-  .dm-added input, .dm-added select, .dm-added textarea {
-    display: block; width: 100%; box-sizing: border-box; margin-top: 4px; font: inherit;
-    border: 1px solid #8e8e93; border-radius: 10px; padding: 10px 12px; min-height: 46px;
-  }
-  .dm-added textarea { min-height: 140px; resize: vertical; }
-  .dm-added button {
-    margin-top: 16px; font: inherit; font-weight: 600; cursor: pointer;
-    background: #0a5bd6; color: #fff; border: 0; border-radius: 10px; padding: 11px 20px; min-height: 46px;
-  }
-  .dm-added button[disabled] { opacity: .6; cursor: progress; }
-  .dm-added .cf-turnstile { margin-top: 16px; min-height: 65px; }
-  .dm-added .dm-hp { position: absolute !important; left: -10000px !important; width: 1px; height: 1px; overflow: hidden; }
-  .dm-added .dm-status { min-height: 1.5em; margin: 10px 0 0; font-weight: 500; }
-  .dm-added .dm-status.ok { color: #157a46; }
-  .dm-added .dm-status.warn { color: #9a5b00; }
-  .dm-added .dm-status.err { color: #b3261e; }
-  @media (prefers-color-scheme: dark) {
-    .dm-added { border-top-color: #3a3a3c; }
-    .dm-added label span { color: #8e8e93; }
-    .dm-added button { background: #4cb8ff; color: #06101f; }
-    .dm-added .dm-status.ok { color: #4cd08a; }
-    .dm-added .dm-status.warn { color: #f0b45a; }
-    .dm-added .dm-status.err { color: #ff8a80; }
-  }
-</style>`;
+const MAILTO = `<a href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a>`;
 
-const GITHUB = `<a href="https://github.com/grout58">github.com/grout58</a>`;
-const MAILTO = SUPPORT_EMAIL && `<a href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a>`;
-
-function contactSection(app) {
+// The feedback form (src/feedback.js posts it to /api/feedback), with the app
+// preselected on the per-sport support pages. Styled by .feedback in site.css.
+function feedbackForm(sport) {
+  const app = FEEDBACK_APP[sport] ?? "football";
   const options = FEEDBACK_APPS.map(([value, label]) =>
     `<option value="${value}"${value === app ? " selected" : ""}>${label}</option>`).join("");
-  const reach = MAILTO
-    ? `<p>Email us at ${MAILTO}, or send a message with the form below. You can also reach us on GitHub at ${GITHUB}.</p>`
-    : `<p>Reach us on GitHub at ${GITHUB}, or send a message with the form below.</p>`;
-  return `<section class="dm-added" id="dm-contact" aria-labelledby="dm-contact-h">
-${ADDED_CSS}
-<h2 id="dm-contact-h">Contact us</h2>
-${reach}
-<form class="dm-feedback" action="/api/feedback" method="post" data-app="${app}" novalidate>
-  <label for="dm-name">Name <span>(optional)</span>
-    <input id="dm-name" name="name" type="text" autocomplete="name" maxlength="200"></label>
-  <label for="dm-email">Email address <span>(used only to reply to you)</span>
-    <input id="dm-email" name="email" type="email" autocomplete="email" inputmode="email" required></label>
-  <label for="dm-app">App
-    <select id="dm-app" name="app">${options}</select></label>
-  <label for="dm-message">Message
-    <textarea id="dm-message" name="message" maxlength="4000" required></textarea></label>
-  <div class="dm-hp" aria-hidden="true">
-    <label for="dm-company">Company (leave blank)</label>
-    <input id="dm-company" name="company" type="text" tabindex="-1" autocomplete="off">
-  </div>
-  ${turnstile("auto")}
-  <button type="submit">Send</button>
-  <p class="dm-status" role="status" aria-live="polite"></p>
-</form>
-</section>
-<script src="${TURNSTILE_SCRIPT}" async defer></script>
-<script src="/assets/feedback.js" defer></script>`;
+  return `<form class="dm-feedback feedback" action="/api/feedback" method="post" data-app="${app}" aria-labelledby="feedback-h" novalidate>
+      <label for="dm-name">Name <span>(optional)</span>
+        <input id="dm-name" name="name" type="text" autocomplete="name" maxlength="200"></label>
+      <label for="dm-email">Email address <span>(used only to reply to you)</span>
+        <input id="dm-email" name="email" type="email" autocomplete="email" inputmode="email" required></label>
+      <label for="dm-app">App
+        <select id="dm-app" name="app">${options}</select></label>
+      <label for="dm-message">Message
+        <textarea id="dm-message" name="message" maxlength="4000" required></textarea></label>
+      <div class="hp" aria-hidden="true">
+        <label for="dm-company">Company (leave blank)</label>
+        <input id="dm-company" name="company" type="text" tabindex="-1" autocomplete="off">
+      </div>
+      ${turnstile("dark")}
+      <button type="submit">Send</button>
+      <p class="dm-status" role="status" aria-live="polite"></p>
+    </form>`;
 }
 
 // With BUTTONDOWN on: who else gets signups, matching forwardToButtondown() in
@@ -370,7 +397,7 @@ function privacySection(support) {
 <p>The DraftMatrix apps themselves still collect no data. This section covers only the optional forms on the draftmatrix.app website.</p>
 <p><strong>Email list.</strong> If you sign up, we store your email address, which sport page(s) you signed up from, and when you first and most recently signed up. We use it only to send the draft-season cheat sheet and DraftMatrix app news.${BUTTONDOWN ? ` ${BUTTONDOWN_EMAIL_LIST}` : ""}</p>
 <p><strong>Feedback form.</strong> If you send feedback, we store your name (optional), your email address, the app you chose, your message, and the time you sent it. We use it only to reply to you.</p>
-<p>Both are stored with ${esc(PROVIDER)}, and kept until you unsubscribe or ask us to delete them. You can unsubscribe anytime, or ask for deletion ${MAILTO ? `by emailing ${MAILTO} or ` : ""}through the <a href="${support}">support page</a>. ${BUTTONDOWN ? "We never sell them, and share them only with the providers named here." : "We never sell or share them."}</p>
+<p>Both are stored with ${esc(PROVIDER)}, and kept until you unsubscribe or ask us to delete them. You can unsubscribe anytime, or ask for deletion by emailing ${MAILTO} or through the <a href="${support}">support page</a>. ${BUTTONDOWN ? "We never sell them, and share them only with the providers named here." : "We never sell or share them."}</p>
 <p>To block spam, the forms use Cloudflare Turnstile, which checks your browser when you use the forms; see <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's privacy policy</a>.</p>
 </section>`;
 }
@@ -425,16 +452,26 @@ function header(current) {
 </header>`;
 }
 
+// DraftMatrix on X, in the footer of every built page. The accessible name
+// keeps the visible handle (WCAG "label in name") and says it opens a new tab.
+const X_URL = "https://x.com/DraftMatrixApp";
+function xLink() {
+  return `<a class="social" href="${X_URL}" rel="me noopener" target="_blank" aria-label="DraftMatrix on X, @DraftMatrixApp (opens in a new tab)">` +
+    `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>` +
+    `@DraftMatrixApp</a>`;
+}
+
 function footer() {
   return `<footer class="site-footer">
   <div class="wrap">
     <ul>
-      <li><a href="/support.html">Support</a></li>
+      <li><a href="/support">Support</a></li>
       <li><a href="/privacy.html">Privacy</a></li>
       <li><a href="/nfl/">Football</a></li>
       <li><a href="/nba/">Hoops</a></li>
       <li><a href="/nhl/">Hockey</a></li>
       <li><a href="/mlb/">Baseball</a></li>
+      <li>${xLink()}</li>
     </ul>
     <p>DraftMatrix is an independent draft tool, not affiliated with, endorsed by, or sponsored by any professional sports league, team, or ranking publisher.</p>
     <p>Apple, the Apple logo, iPhone and iPad are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.</p>
@@ -444,8 +481,9 @@ function footer() {
 }
 
 function layout(page, body) {
-  const url = ORIGIN + page.path;
+  const url = ORIGIN + (page.canonical ?? page.path);
   const og = `${ORIGIN}/assets/og/${page.og}.png`;
+  const ogAlt = page.ogAlt ?? `${page.title.split(" — ")[0]} screenshots`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -465,12 +503,15 @@ ${iconLinks(page.icon)}
 ${page.noindex ? "" : `<meta property="og:url" content="${url}">\n`}<meta property="og:image" content="${og}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="${esc(page.ogAlt ?? `${page.title.split(" — ")[0]} screenshots`)}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:alt" content="${esc(ogAlt)}">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="${TWITTER_SITE}">
 <meta name="twitter:title" content="${esc(page.title)}">
 <meta name="twitter:description" content="${esc(page.description)}">
 <meta name="twitter:image" content="${og}">
-${body.includes("cf-turnstile") ? `<script src="${TURNSTILE_SCRIPT}" async defer></script>\n` : ""}</head>
+<meta name="twitter:image:alt" content="${esc(ogAlt)}">
+${STRUCTURED_DATA[page.path] ? jsonLd(STRUCTURED_DATA[page.path]) : ""}${body.includes("cf-turnstile") ? `<script src="${TURNSTILE_SCRIPT}" async defer></script>\n` : ""}</head>
 <body class="theme-${page.theme}">
 ${header(page.nav)}
 <main id="main">
@@ -478,14 +519,15 @@ ${body.trim()}
 </main>
 ${footer()}
 <script src="/assets/signup.js" defer></script>
-</body>
+${body.includes("dm-feedback") ? `<script src="/assets/feedback.js" defer></script>\n` : ""}</body>
 </html>
 `;
 }
 
 // {{badge:nfl}}  {{signup:nba}}  {{signup:all|Custom heading}}  {{name:nhl}}  {{store:nba}}
 // {{icon:nfl|88}}  {{icon:nba|72|lazy}}  {{motif:brand}}
-function expand(src) {
+// Support page only: {{support:heading}}  {{support:focus}}  {{feedback:form}}
+function expand(src, page) {
   return src.replace(/\{\{(\w+):(\w+)(?:\|([^}]*))?\}\}/g, (m, kind, arg, extra) => {
     if (kind === "badge") return badge(arg);
     if (kind === "icon") return icon(arg, ...(extra ?? "").split("|"));
@@ -493,29 +535,44 @@ function expand(src) {
     if (kind === "signup") return signup(arg, extra);
     if (kind === "name") return esc(APP_NAME[arg]);
     if (kind === "store") return APP_STORE[arg];
+    if (kind === "support" && arg === "heading") return esc(page.focus ? `${APP_NAME[page.focus]} Support` : "DraftMatrix Support");
+    if (kind === "support" && arg === "focus") return supportFocus(page.focus);
+    if (kind === "feedback" && arg === "form") return feedbackForm(page.focus);
     throw new Error(`unknown placeholder ${m}`);
   });
+}
+
+// The support page's app sections sit between <!-- app:<sport> --> and
+// <!-- /app:<sport> -->. On a per-sport support page that app's section moves first.
+const APP_BLOCK = /<!-- app:(\w+) -->[\s\S]*?<!-- \/app:\1 -->\n?/g;
+function orderApps(src, focus) {
+  if (!focus) return src;
+  const blocks = [...src.matchAll(APP_BLOCK)];
+  const first = blocks.find((b) => b[1] === focus);
+  if (!first) throw new Error(`no app section for ${focus} in support.html`);
+  const ordered = [first, ...blocks.filter((b) => b !== first)].map((b) => b[0]).join("");
+  const start = blocks[0].index, end = blocks.at(-1).index + blocks.at(-1)[0].length;
+  return src.slice(0, start) + ordered + src.slice(end);
+}
+
+// The line under the heading on a per-sport support page.
+function supportFocus(focus) {
+  if (!focus) return "";
+  const anchor = SUPPORT_ANCHOR[focus];
+  return `<p class="small">This page covers every DraftMatrix app. <a href="#${anchor}">${esc(APP_NAME[focus])}</a> is first; the others follow.</p>`;
 }
 
 function build() {
   rmSync(DIST, { recursive: true, force: true });
   mkdirSync(DIST, { recursive: true });
 
+  if (!SUPPORT_EMAIL) throw new Error("SUPPORT_EMAIL must be set");
   for (const [src, page] of Object.entries(LEGACY)) {
     const html = readFileSync(join(ROOT, src), "utf8");
-    const section = page.add === "contact" ? contactSection(page.app) : privacySection(page.support);
-    let out = inject(src, html, section);
-    if (page.add === "privacy" && MAILTO) out = replaceContact(src, out, page.support);
+    let out = replaceContact(src, inject(src, html, privacySection(page.support)), page.support);
     if (page.icon) out = insertInline(src, out, out.indexOf("</head>"), iconLinks(page.icon));
-    if (page.appId) {
-      // At the end of the viewport meta's line, inside <head>.
-      const viewport = out.indexOf('<meta name="viewport"');
-      const at = viewport < 0 || viewport > out.indexOf("</head>") ? -1 : out.indexOf("\n", viewport);
-      out = insertInline(src, out, at, appBanner(page.appId));
-    }
     writeFileSync(join(DIST, page.out), out);
   }
-  if (!SUPPORT_EMAIL) console.warn("WARNING: SUPPORT_EMAIL not set; support and privacy pages show GitHub + the feedback form only.");
 
   cpSync(join(ROOT, "assets"), join(DIST, "assets"), { recursive: true });
   copyFileSync(join(ROOT, "src", "site.css"), join(DIST, "assets", "site.css"));
@@ -536,7 +593,7 @@ function build() {
 
   for (const page of [...PAGES, NOT_FOUND]) {
     signupCount = 0;
-    const body = expand(readFileSync(join(ROOT, "src", "pages", page.src), "utf8"));
+    const body = expand(orderApps(readFileSync(join(ROOT, "src", "pages", page.src), "utf8"), page.focus), page);
     const html = layout(page, body);
     if (/\{\{/.test(html)) throw new Error(`unexpanded placeholder in ${page.src}`);
     const dest = join(DIST, page.out);
@@ -547,29 +604,44 @@ function build() {
   // Pages already serves /support.html at /support (pretty URLs), so a
   // /support -> /support.html rule would loop. The legacy GitHub Pages paths
   // point straight at the bare paths to save a hop.
-  // Flat legacy pages (support.html etc.) have no /x/index.html, so /x/ is a
-  // 404 on Pages; send it to /x. No loop: /x serves x.html directly.
-  const slashRules = Object.values(LEGACY).map((page) => page.out)
-    .filter((out) => out.endsWith(".html") && !out.endsWith("index.html"))
+  // Flat pages at the root (support.html, hockey.html, privacy.html etc.) have no
+  // /x/index.html, so /x/ is a 404 on Pages; send it to /x. No loop: /x serves
+  // x.html directly.
+  const slashRules = [...PAGES.map((page) => page.out), ...Object.values(LEGACY).map((page) => page.out)]
+    .filter((out) => out.endsWith(".html") && !out.includes("/") && out !== "index.html")
     .map((out) => out.slice(0, -".html".length))
     .map((name) => `/${name}/ /${name} 301`);
+  // Old GitHub Pages paths of those pages go straight to the bare path, ahead of
+  // the splat: through it, /draftmatrix-site/x.html (or x/) would take two hops
+  // (-> /x.html, then Pages' 308 -> /x; or -> /x/, then the slash rule -> /x).
+  const legacyRules = slashRules.map((rule) => rule.split(" ")[1])
+    .flatMap((bare) => [`/draftmatrix-site${bare}.html ${bare} 301`, `/draftmatrix-site${bare}/ ${bare} 301`]);
   writeFileSync(join(DIST, "_redirects"), [
     "/draftmatrix-site /support 301",
     "/draftmatrix-site/ /support 301",
     "/draftmatrix-site/index.html /support 301",
+    ...legacyRules,
     "/draftmatrix-site/* /:splat 301",
     ...slashRules,
     "",
   ].join("\n"));
 
-  const urls = [...PAGES.map((p) => p.path), ...SITEMAP_LEGACY];
+  // Pages whose canonical is another URL (the per-sport support pages) stay out.
+  const urls = [...PAGES.filter((p) => !p.canonical).map((p) => p.path), ...SITEMAP_LEGACY];
   writeFileSync(join(DIST, "sitemap.xml"),
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     urls.map((u) => `  <url><loc>${ORIGIN}${u}</loc></url>`).join("\n") + `\n</urlset>\n`);
 
   writeFileSync(join(DIST, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${ORIGIN}/sitemap.xml\n`);
 
-  console.log(`Built ${PAGES.length} pages + 404.html + ${Object.keys(LEGACY).length} legacy files into ${DIST === join(ROOT, "dist") ? "dist/" : DIST} (SIGNUP_LIVE=${SIGNUP_LIVE}, BUTTONDOWN_LIVE=${BUTTONDOWN})`);
+  // Longer browser caching for images only. Asset names aren't fingerprinted (a
+  // regenerated screenshot keeps its name), so a week rather than immutable; CSS,
+  // JS and HTML keep Pages' defaults so a change reaches visitors right away.
+  // Static assets only: the worker's /api/* responses don't get _headers. No CSP.
+  writeFileSync(join(DIST, "_headers"), IMAGE_DIRS.map((dir) =>
+    `/assets/${dir}/*\n  Cache-Control: public, max-age=${IMAGE_MAX_AGE}\n`).join("\n"));
+
+  console.log(`Built ${PAGES.length} pages + 404.html + ${Object.keys(LEGACY).length} legacy privacy pages into ${DIST === join(ROOT, "dist") ? "dist/" : DIST} (SIGNUP_LIVE=${SIGNUP_LIVE}, BUTTONDOWN_LIVE=${BUTTONDOWN})`);
 }
 
 build();
