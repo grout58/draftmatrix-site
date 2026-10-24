@@ -13,11 +13,11 @@ The marketing and support site for the DraftMatrix apps, for Cloudflare Pages at
 
 | Page | Tint (top → bottom) | Artwork | Favicon / touch icon |
 |---|---|---|---|
-| `/` | `#1d2430` → `#0b0f14` | tile motif, all three real icons on the app cards | football icon |
+| `/` | `#1d2430` → `#0b0f14` | tile motif, all three real icons on the app cards; tile motif on the baseball "Next up" band and card | football icon |
 | `/nfl/` | `#284a33` → `#07170d` | football icon | football icon |
 | `/nba/` | `#2f1e13` → `#130e08` | hoops icon | hoops icon |
 | `/nhl/` | `#233851` → `#071019` | hockey icon | hockey icon |
-| `/mlb/` | `#1d2430` → `#0b0f14` | tile motif (there is no baseball app icon) | tile motif (`assets/icons/motif.svg`, `motif-64.png`, `motif-180.png`) |
+| `/mlb/` | `#1d2430` → `#0b0f14` | tile motif (there is no baseball app icon); no App Store badge, store link or Smart App Banner | tile motif (`assets/icons/motif.svg`, `motif-64.png`, `motif-180.png`) |
 
 ```
 build.mjs              build script (SIGNUP_LIVE, BUTTONDOWN_LIVE, SUPPORT_EMAIL, PROVIDER, TURNSTILE_SITEKEY at the top)
@@ -30,7 +30,7 @@ assets/                screenshots, icons, OG images, App Store badges (committe
 scripts/screens.py     regenerates assets/screens from ../DraftMatrix
 scripts/icons.py       regenerates assets/icons from .work/icon-<sport>-1024.png
 scripts/motif_icon.py  draws assets/icons/motif.svg, motif-64.png, motif-180.png (baseball favicon)
-scripts/og.py          regenerates assets/og/*.png (1200x630)
+scripts/og.py          regenerates assets/og/*.png (1200x630); `og.py mlb` redraws one card
 scripts/export-signups.mjs   SIGNUPS KV -> signups.csv (Cloudflare REST API)
 scripts/export-feedback.mjs  FEEDBACK KV -> feedback.csv
 scripts/buttondown-import.mjs  one-time import of signups into Buttondown (off until enabled; DEPLOY.md)
@@ -57,7 +57,7 @@ What ends up in `dist/`:
 
 | Path | Source |
 |---|---|
-| `/` (`index.html`) | new home page |
+| `/` (`index.html`) | new home page; a "Next up" band under the signup features baseball (coming January 2027) and links to `/mlb/` and its signup |
 | `/nfl/`, `/nba/`, `/nhl/`, `/mlb/` | new sport pages (`<slug>/index.html`) |
 | `/support.html` | the old `index.html` (football support) plus an added Contact us section |
 | `/hockey.html`, `/basketball.html`, `/baseball.html` | copied, plus an added Contact us section |
@@ -83,6 +83,8 @@ python3 scripts/screens.py   # screenshots from the app repos
 python3 scripts/icons.py     # app icons: 512/256/128 webp+png, 180 touch, 64 favicon
 python3 scripts/og.py        # Open Graph images (needs the icons first)
 ```
+
+From a git worktree, where `../DraftMatrix` isn't beside the repo, point the OG script at the apps directory and name the card(s) to redraw: `DM_APPS=/path/to/DraftMatrix/apps python3 scripts/og.py mlb`. The baseball card has a green "Coming January 2027" pill in place of the tier chips; it names no launch day.
 
 `scripts/icons.py` reads the 1024px App Store icons from `.work/icon-nfl-1024.png`, `icon-nba-1024.png` and `icon-nhl-1024.png`. `.work/` is not committed, so copy them there first (the current files are JPEG data with a `.png` name; Pillow reads them either way). Baseball has no released icon: there must be no `assets/icons/mlb-*`, and `scripts/check.py` fails if one appears or is referenced. The baseball page, its home card and its OG image use the tile motif instead, and `/mlb/` plus the two baseball legacy pages use the motif favicon from `python3 scripts/motif_icon.py` (no inputs; same geometry as the header SVG).
 

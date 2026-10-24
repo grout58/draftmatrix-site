@@ -86,6 +86,9 @@ a:hover { text-decoration-thickness: 2px; }
 .motif i:nth-child(3n) { --c: var(--tier-3); }
 .motif i:nth-child(n+4) { opacity: .5; }
 .motif i:nth-child(n+7) { opacity: .24; }
+/* Percentage padding resolves against the parent's width, which blows the tile up
+   in wide flex/card parents. Grid tracks and gaps resolve against the tile itself. */
+.motif { padding: 0; grid-template-columns: repeat(3, 20%); justify-content: center; gap: 6% 5.8%; }
 
 /* ---------- tier chips ---------- */
 
@@ -262,6 +265,17 @@ section.alt { background: var(--alt); border-top: 1px solid var(--line); border-
 .signup-band { padding: 0 0 48px; }
 .signup-band .signup-box { max-width: 760px; }
 .hero .signup-box { margin: 20px 0 12px; }
+
+/* Home: the next app (baseball), between the signup band and the in-person section */
+.next-up { padding: 0 0 48px; }
+.next-card {
+  background: var(--card); border: 1px solid var(--card-line); border-radius: var(--radius);
+  padding: 24px; max-width: 760px; display: flex; gap: 20px; align-items: flex-start;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07);
+}
+.next-card > .motif { width: 72px; height: 72px; flex: none; box-shadow: 0 12px 30px rgba(0,0,0,.45); }
+.next-card h2 { font-size: clamp(1.3rem, 2.6vw, 1.6rem); }
+@media (max-width: 520px) { .next-card { flex-direction: column; } }
 
 /* ---------- footer ---------- */
 

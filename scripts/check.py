@@ -30,6 +30,10 @@ Checks:
 - the Turnstile script loads on exactly the pages that have a form, each widget
   carries the sitekey, and it is the only third-party script.
 - there is no baseball app icon (no assets/icons/mlb-*, no reference to one).
+- baseball is unreleased: /mlb/ has no App Store badge or apps.apple.com link, no
+  new page says "pre-order", the launch is "January 2027" with no day, and /mlb/
+  carries its own share image (absolute og:image/twitter:image to og/mlb.png, a
+  1200x630 PNG, with og:image:width/height/alt and a summary_large_image card).
 - the privacy blocks don't mention data the worker no longer stores (user-agent).
 - Buttondown: while BUTTONDOWN_LIVE is false in build.mjs, no file in dist/ but
   _worker.js mentions Buttondown; while true, the privacy blocks name it. Either way,
@@ -274,6 +278,30 @@ def check_files():
     for page, html in pages.items():
         if "icons/mlb" in html:
             fail(f"{page} references a baseball app icon")
+
+    # Baseball isn't on the App Store: no badge, store link or pre-order, and no launch day.
+    mlb = pages["mlb/index.html"]
+    if "app-store-black.svg" in mlb or "apps.apple.com" in mlb:
+        fail("mlb/index.html has an App Store badge or link")
+    if "January 2027" not in visible(mlb):
+        fail("mlb/index.html doesn't say January 2027")
+    for page in NEW:
+        text = visible(pages[page])
+        if re.search(r"pre-?order", text, re.I):
+            fail(f"{page} mentions a pre-order")
+        if re.search(r"\bJan(uary)?\.? \d{1,2}\b", text):
+            fail(f"{page} names a baseball launch day")
+    og = "https://draftmatrix.app/assets/og/mlb.png"
+    for tag in [f'<meta property="og:image" content="{og}">', '<meta property="og:image:width" content="1200">',
+                '<meta property="og:image:height" content="630">', '<meta property="og:image:alt" content="',
+                '<meta name="twitter:card" content="summary_large_image">', f'<meta name="twitter:image" content="{og}">']:
+        if tag not in mlb:
+            fail(f"mlb/index.html lacks {tag}")
+    png = (DIST / "assets" / "og" / "mlb.png").read_bytes()
+    size = (int.from_bytes(png[16:20], "big"), int.from_bytes(png[20:24], "big"))
+    print(f"og/mlb.png: {size[0]}x{size[1]}, {len(png) // 1024} KB")
+    if not png.startswith(b"\x89PNG") or size != (1200, 630) or len(png) > 400 * 1024:
+        fail("assets/og/mlb.png isn't a 1200x630 PNG under 400 KB")
 
     # Privacy blocks must match what the worker stores.
     for out in [o for o in LEGACY.values() if "privacy" in o]:
