@@ -5,23 +5,31 @@
     python3 scripts/check.py --serve  # also serve dist/ locally and fetch every page
 
 Checks:
-- each legacy page in dist/ is its source plus exactly one injected block between
+- each legacy privacy page in dist/ is its source plus exactly one injected block between
   <!-- dm-added:start --> and <!-- dm-added:end -->; with that block cut out, the
   bytes match the source exactly, after also cutting out the one-line edits
   between <!-- dm-inline:start --> and <!-- dm-inline:end -->: the motif favicon
-  links in the two baseball pages' <head>, the Smart App Banner meta after the
-  viewport meta on the football, hoops and hockey support pages, and on each privacy page the new
+  links in baseball-privacy.html's <head>, and on each privacy page the new
   Contact sentence (email + support page), compared against the source with its
   old GitHub Contact sentence cut out. Nothing else may differ. The legacy
-  sources themselves are unmodified.
-- no "github.com/grout58" text or link is left on the four dist privacy pages
-  (support pages keep GitHub as a secondary contact).
+  sources (all root *.html, including the old support pages the build no longer
+  copies) are unmodified.
+- no "github" text or link anywhere in any HTML file in dist/.
+- the four support pages (support.html for all apps; hockey.html, basketball.html and
+  baseball.html, the old per-sport support URLs) are built from src/pages/support.html:
+  each has the four app sections and every FAQ id, the page's own app first, an App
+  Store link per released app and a link to each privacy page, the feedback form
+  (posting to /api/feedback, the page's app preselected, feedback.js loaded), canonical
+  /support, and only /support is in sitemap.xml.
 - support@draftmatrix.app is a mailto: link on all 4 support and all 4 privacy
   pages (privacy: in the Contact line and in the deletion sentence), and no
   "SUPPORT_EMAIL" placeholder text or comment is left anywhere in dist/.
-- /mlb/ and the two baseball legacy pages use the motif favicon (assets/icons/motif*).
+- every built page's footer links to X (https://x.com/DraftMatrixApp) with
+  rel="me noopener", target="_blank", an aria-label containing the visible handle,
+  and an aria-hidden SVG.
+- /mlb/, baseball.html and baseball-privacy.html use the motif favicon (assets/icons/motif*).
 - <meta name="apple-itunes-app"> appears exactly once, in <head>, with the right app id
-  on the home, /nfl/, /nba/, /nhl/ and the football, hoops and hockey support pages,
+  on the home, /nfl/, /nba/, /nhl/, /support (football, as before), /hockey and /basketball,
   and on no other HTML file (not baseball, privacy or 404).
 - the new pages and the injected blocks carry no league or ranking-publisher names
   in visible text, alt/aria text or meta tags (URL slugs like /nfl/ and form values
@@ -38,8 +46,9 @@ Checks:
   the confirm-by-email success message, and differ from dist/ only there.
 - scripts/buttondown-import.mjs uses the same SPORTS and EMAIL as the worker.
 - dist/_worker.js passes scripts/worker-test.mjs (run in node with fake KV and ASSETS).
-- dist/_redirects keeps the /draftmatrix-site rules and has a 301 from /x/ to /x
-  for every flat legacy page (and there's no dist/x/index.html to loop with).
+- dist/_redirects keeps the /draftmatrix-site rules and, for every flat page at the
+  dist root, has a 301 from /x/ to /x (and there's no dist/x/index.html to loop with)
+  and a 301 from /draftmatrix-site/x.html straight to /x, ahead of the splat rule.
 - dist/404.html exists (so Pages answers unknown paths with 404, not index.html),
   has <meta name="robots" content="noindex"> and no canonical/og:url, and is not in
   sitemap.xml or linked from any page.
@@ -60,24 +69,25 @@ ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "dist"
 
 LEGACY = {
-    "index.html": "support.html",
     "privacy.html": "privacy.html",
-    "hockey.html": "hockey.html",
     "hockey-privacy.html": "hockey-privacy.html",
-    "basketball.html": "basketball.html",
     "basketball-privacy.html": "basketball-privacy.html",
-    "baseball.html": "baseball.html",
     "baseball-privacy.html": "baseball-privacy.html",
 }
-NEW = ["index.html", "nfl/index.html", "nba/index.html", "nhl/index.html", "mlb/index.html", "404.html"]
+# Root legacy sources that must never change, including the old support pages that
+# the build no longer copies (GitHub Pages still serves them from main).
+ROOT_SOURCES = list(LEGACY) + ["index.html", "hockey.html", "basketball.html", "baseball.html"]
+# Support pages built from src/pages/support.html -> the app whose section comes first.
+SUPPORT = {"support.html": None, "hockey.html": "hockey", "basketball.html": "hoops", "baseball.html": "baseball"}
+SUPPORT_APPS = ["football", "hoops", "hockey", "baseball"]
+FEEDBACK_APP = {None: "football", "hockey": "hockey", "hoops": "hoops", "baseball": "baseball"}
+NEW = ["index.html", "nfl/index.html", "nba/index.html", "nhl/index.html", "mlb/index.html", "404.html", *SUPPORT]
 REQUIRED = NEW + list(LEGACY.values()) + ["_redirects", "_routes.json", "_worker.js", "sitemap.xml",
                                           "robots.txt", "assets/site.css", "assets/signup.js", "assets/feedback.js"]
 ADDED = re.compile(rb"<!-- dm-added:start -->\n.*?<!-- dm-added:end -->\n", re.S)
 INLINE = re.compile(rb"<!-- dm-inline:start -->[^\n]*?<!-- dm-inline:end -->")
 # Expected dm-inline additions per legacy page in dist/, in page order.
 INLINE_EXPECTED = {
-    "support.html": ["banner"], "hockey.html": ["banner"], "basketball.html": ["banner"],
-    "baseball.html": ["favicon"],
     "privacy.html": ["email"], "hockey-privacy.html": ["email"], "basketball-privacy.html": ["email"],
     "baseball-privacy.html": ["favicon", "email"],
 }
@@ -114,6 +124,9 @@ SRCSET = re.compile(r'srcset="([^"]*)"')
 RELATIVE_REF = re.compile(r'(?:href|src)="([\w-]+\.html)')
 SCRIPT_SRC = re.compile(r'<script\b[^>]*\bsrc="([^"]+)"')
 TURNSTILE_SCRIPT = "https://challenges.cloudflare.com/turnstile/v0/api.js"
+X_URL = "https://x.com/DraftMatrixApp"
+# Flat pages at the dist root, each with a /x/ -> /x rule in _redirects.
+FLAT = [*SUPPORT, *LEGACY.values()]
 SITEKEY = re.search(r'TURNSTILE_SITEKEY = "([^"]+)"', (ROOT / "build.mjs").read_text()).group(1)
 BUDGET = 8 * 1024 * 1024
 BUTTONDOWN_LIVE = re.search(r"^const BUTTONDOWN_LIVE = (true|false);", (ROOT / "build.mjs").read_text(), re.M).group(1) == "true"
@@ -158,15 +171,12 @@ def check_files():
             fail(f"{out} has {len(blocks)} added blocks, expected 1")
         if not same:
             fail(f"{out} differs from {src} outside the added blocks")
-        kinds = ["banner" if b"apple-itunes-app" in m.group(0) else "favicon" if b"motif" in m.group(0)
+        kinds = ["favicon" if b"motif" in m.group(0)
                  else "email" if SUPPORT_EMAIL.encode() in m.group(0) else "?" for m in inline]
         if kinds != INLINE_EXPECTED[out]:
             fail(f"{out} inline additions {kinds}, expected {INLINE_EXPECTED[out]}")
         for m in inline:
-            if b"apple-itunes-app" in m.group(0):
-                if not re.search(rb'<meta name="viewport"[^\n]*$', built[:m.start()]):
-                    fail(f"{out}: Smart App Banner isn't right after the viewport meta")
-            elif b"motif" in m.group(0):
+            if b"motif" in m.group(0):
                 if not built[m.end():].startswith(b"</head>"):
                     fail(f"{out}: favicon links aren't just before </head>")
             else:
@@ -175,11 +185,6 @@ def check_files():
                 if not (built[:m.start()].endswith(b"Questions? ") and b"<h2>Contact</h2>" in built[m.start() - 300:m.start()]
                         and m.group(0) == f"<!-- dm-inline:start -->{want}<!-- dm-inline:end -->".encode()):
                     fail(f"{out}: Contact sentence isn't the expected email + support page replacement")
-        if out in SUPPORT_PAGE:
-            hits = built.lower().count(b"github.com/grout58")
-            print(f"github.com/grout58 in dist/{out}: {hits}")
-            if hits:
-                fail(f"{out} still mentions github.com/grout58")
         scanned[f"{out} (added block)"] = b"".join(blocks + [m.group(0) for m in inline]).decode()
 
     redirects = (DIST / "_redirects").read_text().splitlines()
@@ -187,11 +192,13 @@ def check_files():
                  "/draftmatrix-site/index.html /support 301", "/draftmatrix-site/* /:splat 301"]:
         if rule not in redirects:
             fail(f"_redirects missing {rule!r}")
-    for out in LEGACY.values():
+    for out in FLAT:
         name = out[: -len(".html")]
-        rule = f"/{name}/ /{name} 301"
-        if rule not in redirects:
-            fail(f"_redirects missing {rule!r}")
+        for rule in [f"/{name}/ /{name} 301", f"/draftmatrix-site/{name}.html /{name} 301"]:
+            if rule not in redirects:
+                fail(f"_redirects missing {rule!r}")
+        if redirects.index(f"/draftmatrix-site/{name}.html /{name} 301") > redirects.index("/draftmatrix-site/* /:splat 301"):
+            fail(f"_redirects: /draftmatrix-site/{name}.html comes after the splat rule, so it never matches")
         if (DIST / name / "index.html").exists():
             fail(f"dist/{name}/index.html exists, so /{name}/ -> /{name} would loop")
     print(f"_redirects: {len(redirects)} rules")
@@ -199,7 +206,7 @@ def check_files():
     if (ROOT / "functions").exists():
         fail("functions/ still exists")
 
-    diff = subprocess.run(["git", "diff", "--stat", "--", *LEGACY], cwd=ROOT, capture_output=True, text=True)
+    diff = subprocess.run(["git", "diff", "HEAD", "--stat", "--", *ROOT_SOURCES], cwd=ROOT, capture_output=True, text=True)
     print(f"git diff on legacy sources: {diff.stdout.strip() or 'none'}")
     if diff.stdout.strip():
         fail("legacy sources modified")
@@ -240,7 +247,34 @@ def check_files():
             if not re.search(r"\basync\b", tag) or not re.search(r"\bdefer\b", tag):
                 fail(f"{page}: Turnstile script must be async defer")
 
+    # No GitHub anywhere on the site (owner's rule): every HTML file in dist/.
+    for f in sorted(DIST.rglob("*.html")):
+        if "github" in f.read_text().lower():
+            fail(f"dist/{f.relative_to(DIST)} mentions GitHub")
+    print("github in dist/*.html: checked")
+
+    check_support(pages)
+
+    # X link in the footer of every built page.
+    for page in NEW:
+        footer = pages[page][pages[page].find('<footer class="site-footer">'):]
+        link = re.search(r'<a [^>]*href="' + re.escape(X_URL) + r'"[^>]*>(.*?)</a>', footer, re.S)
+        ok = bool(link)
+        if link:
+            tag = link.group(0)[: link.group(0).index(">") + 1]
+            text = TAG.sub("", link.group(1)).strip()
+            label = re.search(r'aria-label="([^"]*)"', tag)
+            ok = ('rel="me noopener"' in tag and 'target="_blank"' in tag and text and label
+                  and text in label.group(1) and re.search(r'<svg[^>]*aria-hidden="true"', link.group(1)))
+        print(f"x link dist/{page}: {'yes' if ok else 'MISSING/BAD'}")
+        if not ok:
+            fail(f"{page}: footer X link missing or without rel/target/aria-label/aria-hidden svg")
+
     # Support email on every support and privacy page; no placeholder left.
+    for out in SUPPORT:
+        print(f"support email dist/{out}: {pages[out].count(MAILTO)} mailto link(s)")
+        if MAILTO not in pages[out]:
+            fail(f"{out}: no mailto link for {SUPPORT_EMAIL}")
     for out in LEGACY.values():
         html = pages[out]
         block = b"".join(ADDED.findall((DIST / out).read_bytes())).decode()
@@ -332,6 +366,57 @@ def check_files():
         fail("dist over 8 MB")
 
 
+def check_support(pages):
+    """The four support pages built from src/pages/support.html."""
+    sitemap = (DIST / "sitemap.xml").read_text()
+    faq_ids = re.findall(r'<details id="([\w-]+)"', (ROOT / "src" / "pages" / "support.html").read_text())
+    if len(faq_ids) < 5:
+        fail(f"src/pages/support.html has only {len(faq_ids)} FAQ items with ids")
+    for out, focus in SUPPORT.items():
+        html = pages[out]
+        main = html[html.find('<main id="main">'):html.find("</main>")]
+        order = re.findall(r'<section class="card[^"]*" id="(' + "|".join(SUPPORT_APPS) + r')"', main)
+        want_order = SUPPORT_APPS if focus is None else [focus] + [a for a in SUPPORT_APPS if a != focus]
+        problems = []
+        if order != want_order:
+            problems.append(f"app sections {order}, expected {want_order}")
+        for fid in faq_ids + ["contact", "faq"]:
+            if html.count(f'id="{fid}"') != 1:
+                problems.append(f"id {fid!r} not exactly once")
+        for app_id in ["6806661645", "6814882709", "6811083062"]:
+            if f'href="https://apps.apple.com/us/app/id{app_id}"' not in main:
+                problems.append(f"no App Store link for id{app_id}")
+        for privacy in ["/privacy.html", "/basketball-privacy.html", "/hockey-privacy.html", "/baseball-privacy.html"]:
+            if f'href="{privacy}"' not in main:
+                problems.append(f"no link to {privacy}")
+        if 'href="/mlb/' not in main:
+            problems.append("no link to /mlb/")
+        form = re.search(r'<form class="dm-feedback[^"]*" action="/api/feedback" method="post"[^>]*>.*?</form>', main, re.S)
+        if not form:
+            problems.append("no feedback form posting to /api/feedback")
+        else:
+            selected = re.findall(r'<option value="(\w+)" selected>', form.group(0))
+            if selected != [FEEDBACK_APP[focus]]:
+                problems.append(f"feedback app preselected {selected}, expected {FEEDBACK_APP[focus]}")
+            for name in ["name", "email", "app", "message", "company"]:
+                if f'name="{name}"' not in form.group(0):
+                    problems.append(f"feedback form has no {name} field")
+        if html.count('<script src="/assets/feedback.js" defer></script>') != 1:
+            problems.append("feedback.js not loaded exactly once")
+        if '<link rel="canonical" href="https://draftmatrix.app/support">' not in html:
+            problems.append("canonical isn't /support")
+        if not re.search(r"<title>[^<]*Support[^<]*</title>", html):
+            problems.append("title doesn't say Support")
+        print(f"support page dist/{out}: {'ok' if not problems else problems}")
+        for p in problems:
+            fail(f"{out}: {p}")
+    if "<loc>https://draftmatrix.app/support</loc>" not in sitemap:
+        fail("sitemap.xml lacks /support")
+    for name in ["hockey", "basketball", "baseball"]:
+        if f"<loc>https://draftmatrix.app/{name}</loc>" in sitemap:
+            fail(f"sitemap.xml lists /{name}, whose canonical is /support")
+
+
 def check_buttondown_copy(root, label):
     """The Buttondown privacy copy and the confirm-by-email success message, in the built site at root."""
     for out in [o for o in LEGACY.values() if "privacy" in o]:
@@ -411,7 +496,7 @@ def check_serve():
                               cwd=DIST, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         time.sleep(1)
-        paths = ["/", "/nfl/", "/nba/", "/nhl/", "/mlb/"] + [f"/{p}" for p in LEGACY.values()] + \
+        paths = ["/", "/nfl/", "/nba/", "/nhl/", "/mlb/"] + [f"/{p}" for p in FLAT] + \
                 ["/_redirects", "/sitemap.xml", "/robots.txt", "/assets/site.css", "/assets/signup.js",
                  "/assets/feedback.js", "/_routes.json",
                  "/assets/og/default.png", "/assets/badges/app-store-black.svg"]
