@@ -84,6 +84,36 @@ const APP_NAME = {
   mlb: "DraftMatrix: Fantasy Baseball",
 };
 
+// X account for twitter:site on every new page.
+const TWITTER_SITE = "@DraftMatrixApp";
+
+// JSON-LD per page path: WebSite on the home page, SoftwareApplication on the
+// three released apps' pages. Free to download (Pro is an in-app purchase), so
+// the offer is 0 USD. No ratings or review counts. No baseball (not released).
+const appLd = (sport) => ({
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: APP_NAME[sport],
+  operatingSystem: "iOS",
+  applicationCategory: "SportsApplication",
+  url: `https://apps.apple.com/app/id${APP_STORE[sport].match(/\/id(\d+)$/)[1]}`,
+  image: `${ORIGIN}/assets/icons/${sport}-512.png`,
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+});
+const STRUCTURED_DATA = {
+  "/": { "@context": "https://schema.org", "@type": "WebSite", name: "DraftMatrix", url: `${ORIGIN}/` },
+  "/nfl/": appLd("nfl"),
+  "/nba/": appLd("nba"),
+  "/nhl/": appLd("nhl"),
+};
+// "<" escaped so the JSON can't close the <script> early.
+const jsonLd = (data) =>
+  `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>\n`;
+
+// dist/_headers: image folders under /assets/ and their browser cache lifetime (7 days).
+const IMAGE_DIRS = ["screens", "icons", "og", "badges"];
+const IMAGE_MAX_AGE = 604800;
+
 // Legacy files: source at the repo root -> path in dist. The sources are never
 // edited; `add` names the section injected into the dist copy.
 const LEGACY = {
@@ -446,6 +476,7 @@ function footer() {
 function layout(page, body) {
   const url = ORIGIN + page.path;
   const og = `${ORIGIN}/assets/og/${page.og}.png`;
+  const ogAlt = page.ogAlt ?? `${page.title.split(" — ")[0]} screenshots`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -465,12 +496,15 @@ ${iconLinks(page.icon)}
 ${page.noindex ? "" : `<meta property="og:url" content="${url}">\n`}<meta property="og:image" content="${og}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="${esc(page.ogAlt ?? `${page.title.split(" — ")[0]} screenshots`)}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:alt" content="${esc(ogAlt)}">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="${TWITTER_SITE}">
 <meta name="twitter:title" content="${esc(page.title)}">
 <meta name="twitter:description" content="${esc(page.description)}">
 <meta name="twitter:image" content="${og}">
-${body.includes("cf-turnstile") ? `<script src="${TURNSTILE_SCRIPT}" async defer></script>\n` : ""}</head>
+<meta name="twitter:image:alt" content="${esc(ogAlt)}">
+${STRUCTURED_DATA[page.path] ? jsonLd(STRUCTURED_DATA[page.path]) : ""}${body.includes("cf-turnstile") ? `<script src="${TURNSTILE_SCRIPT}" async defer></script>\n` : ""}</head>
 <body class="theme-${page.theme}">
 ${header(page.nav)}
 <main id="main">
@@ -549,14 +583,19 @@ function build() {
   // point straight at the bare paths to save a hop.
   // Flat legacy pages (support.html etc.) have no /x/index.html, so /x/ is a
   // 404 on Pages; send it to /x. No loop: /x serves x.html directly.
-  const slashRules = Object.values(LEGACY).map((page) => page.out)
+  const flatNames = Object.values(LEGACY).map((page) => page.out)
     .filter((out) => out.endsWith(".html") && !out.endsWith("index.html"))
-    .map((out) => out.slice(0, -".html".length))
-    .map((name) => `/${name}/ /${name} 301`);
+    .map((out) => out.slice(0, -".html".length));
+  const slashRules = flatNames.map((name) => `/${name}/ /${name} 301`);
+  // Through the splat, /draftmatrix-site/x.html (and x/) would take two hops:
+  // to /x.html (or /x/), then on to /x. These go straight to /x, ahead of the splat.
+  const oldSiteRules = flatNames.flatMap((name) =>
+    [`/draftmatrix-site/${name}.html /${name} 301`, `/draftmatrix-site/${name}/ /${name} 301`]);
   writeFileSync(join(DIST, "_redirects"), [
     "/draftmatrix-site /support 301",
     "/draftmatrix-site/ /support 301",
     "/draftmatrix-site/index.html /support 301",
+    ...oldSiteRules,
     "/draftmatrix-site/* /:splat 301",
     ...slashRules,
     "",
@@ -568,6 +607,13 @@ function build() {
     urls.map((u) => `  <url><loc>${ORIGIN}${u}</loc></url>`).join("\n") + `\n</urlset>\n`);
 
   writeFileSync(join(DIST, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${ORIGIN}/sitemap.xml\n`);
+
+  // Longer browser caching for images only. Asset names aren't fingerprinted (a
+  // regenerated screenshot keeps its name), so a week rather than immutable; CSS,
+  // JS and HTML keep Pages' defaults so a change reaches visitors right away.
+  // Static assets only: the worker's /api/* responses don't get _headers. No CSP.
+  writeFileSync(join(DIST, "_headers"), IMAGE_DIRS.map((dir) =>
+    `/assets/${dir}/*\n  Cache-Control: public, max-age=${IMAGE_MAX_AGE}\n`).join("\n"));
 
   console.log(`Built ${PAGES.length} pages + 404.html + ${Object.keys(LEGACY).length} legacy files into ${DIST === join(ROOT, "dist") ? "dist/" : DIST} (SIGNUP_LIVE=${SIGNUP_LIVE}, BUTTONDOWN_LIVE=${BUTTONDOWN})`);
 }

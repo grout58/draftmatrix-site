@@ -62,9 +62,15 @@ What ends up in `dist/`:
 | `/support.html` | the old `index.html` (football support) plus an added Contact us section |
 | `/hockey.html`, `/basketball.html`, `/baseball.html` | copied, plus an added Contact us section |
 | `/privacy.html`, `/hockey-privacy.html`, `/basketball-privacy.html`, `/baseball-privacy.html` | copied, plus an added email-list section |
-| `/_redirects`, `/_routes.json`, `/sitemap.xml`, `/robots.txt` | generated |
+| `/_redirects`, `/_routes.json`, `/_headers`, `/sitemap.xml`, `/robots.txt` | generated |
 | `/_worker.js` | `src/_worker.js` |
 | `/assets/` | `assets/` plus the CSS and JS |
+
+### Head tags, structured data and caching (new pages)
+
+The shared head (`layout()` in `build.mjs`) gives every new page a title, meta description, canonical and `og:url` (not on the noindex 404), an absolute 1200×630 PNG `og:image` with type and alt text, `twitter:card` `summary_large_image`, `twitter:site` `@DraftMatrixApp` and `twitter:image:alt`. The home page carries `WebSite` JSON-LD, and `/nfl/`, `/nba/` and `/nhl/` carry `SoftwareApplication` JSON-LD (App Store name, iOS, `SportsApplication`, `apps.apple.com/app/id<ID>`, a 0 USD offer, never ratings or reviews; none for baseball). The first hero screenshot on each page has `fetchpriority="high"`; screenshots further down are `loading="lazy"`. The legacy pages' heads aren't touched (only the inline additions above).
+
+`dist/_headers` sets `Cache-Control: public, max-age=604800` (7 days) on `/assets/screens/*`, `/assets/icons/*`, `/assets/og/*` and `/assets/badges/*`, and nothing else. Asset names aren't fingerprinted (a regenerated screenshot keeps its name), so it's a week rather than a year with `immutable`, and the CSS, JS and HTML keep Pages' default caching so a change shows up right away. It has no CSP (see Stack). `scripts/check.py` checks all of this.
 
 ### Sections added to the legacy pages
 
@@ -121,7 +127,7 @@ npx wrangler@4 pages deploy dist --project-name draftmatrix-site --branch main
 /draftmatrix-site/* /:splat 301
 ```
 
-The old GitHub Pages root was the football support page, so it goes to `/support`. Every other old path keeps its name: `/draftmatrix-site/hockey.html` → `/hockey.html`, which Pages then serves at `/hockey`.
+The old GitHub Pages root was the football support page, so it goes to `/support`. Every other old path keeps its name. For each flat legacy page there are also two rules ahead of the splat, `/draftmatrix-site/hockey.html /hockey 301` and `/draftmatrix-site/hockey/ /hockey 301`, so those reach the page in one hop; through the splat they took two (`/hockey.html`, then Pages' redirect to `/hockey`).
 
 There is deliberately **no** `/support -> /support.html` rule. Pages "pretty URLs" already serve `support.html` at `/support` and redirect `/support.html` to `/support`. A rule sending `/support` back to `/support.html` would loop. For the same reason the redirect targets are the bare paths (`/support`, not `/support.html`), which saves a hop. Only requests that reach Cloudflare use these rules. Old `grout58.github.io/draftmatrix-site/...` links keep going to GitHub Pages until that site is changed.
 
