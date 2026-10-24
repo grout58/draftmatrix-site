@@ -277,11 +277,64 @@ section.alt { background: var(--alt); border-top: 1px solid var(--line); border-
 .next-card h2 { font-size: clamp(1.3rem, 2.6vw, 1.6rem); }
 @media (max-width: 520px) { .next-card { flex-direction: column; } }
 
+/* ---------- support page ---------- */
+
+/* App sections: one card per app, its tint from the sport theme */
+.support-apps { display: grid; gap: 18px; }
+@media (min-width: 720px) { .support-apps { grid-template-columns: 1fr 1fr; } }
+.support-apps .card { scroll-margin-top: 16px; }
+.support-apps .card.theme-nfl, .support-apps .card.theme-nba, .support-apps .card.theme-nhl {
+  background: linear-gradient(180deg, var(--hi), var(--bg));
+}
+.app-head { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+.app-head .app-icon, .app-head .motif { width: 64px; height: 64px; margin: 0; flex: none; }
+.app-head h3 { font-size: 1.3rem; margin: 0; }
+.support-apps ul { margin: 0 0 12px; padding-left: 20px; }
+.support-apps li { margin-bottom: 4px; }
+
+/* FAQ: native disclosure widgets, one per question */
+.faq-list { max-width: 50em; }
+.faq-list details { border-top: 1px solid var(--line); scroll-margin-top: 16px; }
+.faq-list details:last-child { border-bottom: 1px solid var(--line); }
+.faq-list summary {
+  cursor: pointer; font-weight: 600; padding: 14px 28px 14px 0; position: relative; list-style: none;
+}
+.faq-list summary::-webkit-details-marker { display: none; }
+.faq-list summary::after {
+  content: "+"; position: absolute; right: 4px; top: 12px; font-size: 1.25rem; color: var(--tier-3);
+}
+.faq-list details[open] > summary::after { content: "\2212"; }
+.faq-list .answer { padding: 0 0 14px; color: var(--muted); }
+.faq-list .answer p:last-child, .faq-list .answer ul:last-child { margin-bottom: 0; }
+.faq-list .answer strong { color: var(--text); }
+
+/* Contact: email and the feedback form */
+.contact-box { max-width: 640px; }
+.feedback label { display: block; margin-top: 14px; font-weight: 600; font-size: .95rem; }
+.feedback label span { font-weight: 400; color: var(--muted); }
+.feedback input, .feedback select, .feedback textarea {
+  display: block; width: 100%; margin-top: 4px; font: inherit; font-weight: 400; color: var(--text);
+  background: rgba(0,0,0,.35); border: 1px solid var(--field); border-radius: 10px; padding: 10px 12px; min-height: 46px;
+}
+.feedback textarea { min-height: 140px; resize: vertical; }
+.feedback button {
+  margin-top: 16px; font: inherit; font-weight: 600; cursor: pointer;
+  background: var(--accent); color: var(--accent-text); border: 0; border-radius: 10px; padding: 11px 20px; min-height: 46px;
+}
+.feedback button[disabled] { opacity: .6; cursor: progress; }
+.feedback .cf-turnstile { margin-top: 16px; min-height: 65px; }
+.dm-status { min-height: 1.5em; margin: 10px 0 0; font-weight: 500; }
+.dm-status.ok { color: var(--ok); }
+.dm-status.warn { color: var(--warn); }
+.dm-status.err { color: var(--err); }
+
 /* ---------- footer ---------- */
 
 .site-footer { border-top: 1px solid var(--line); padding: 32px 0 48px; font-size: .9rem; color: var(--muted); }
 .site-footer ul { list-style: none; padding: 0; margin: 0 0 14px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
 .site-footer p { max-width: 52em; }
+.site-footer .social { display: inline-flex; align-items: center; gap: 6px; }
+.site-footer .social svg { flex: none; }
 
 @media (prefers-reduced-motion: no-preference) {
   html { scroll-behavior: smooth; }

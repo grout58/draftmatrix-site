@@ -4,14 +4,16 @@
     python3 scripts/verify-deploy.py [dist] [base-url]   # defaults: dist https://draftmatrix.app
 
 Builds nothing. For every file in dist/ except _worker.js, _routes.json,
-_redirects and 404.html, works out the URL Pages serves it at (x/index.html -> /x/,
+_redirects, _headers and 404.html, works out the URL Pages serves it at (x/index.html -> /x/,
 foo.html -> /foo, index.html -> /), fetches it (following at most one redirect)
-and compares the SHA-256 of the bytes. Also checks that /_redirects and
-/_routes.json are 404, that a random missing path (/__verify-missing-<hex>) is
+and compares the SHA-256 of the bytes. Also checks that /_redirects,
+/_routes.json and /_headers are 404, that a random missing path (/__verify-missing-<hex>) is
 404 with dist/404.html as its body (404.html has no URL of its own, so it isn't
 fetched directly), and that the rules in dist/_redirects answer with their
 codes and targets; for exact (non-splat) rules, such as /support/ -> /support,
-the target must then answer 200 itself. Prints a table and exits 1 on any failure. Stdlib only.
+the target must then answer 200 itself. For each /assets/<dir>/* rule in
+dist/_headers, one file in that folder must answer with the rule's
+Cache-Control. Prints a table and exits 1 on any failure. Stdlib only.
 """
 
 import hashlib
@@ -25,7 +27,7 @@ from pathlib import Path
 
 # 404.html is skipped here because Pages has no fixed URL for it; check_missing
 # fetches a random missing path instead and compares the body against it.
-SKIP = {"_worker.js", "_routes.json", "_redirects", "404.html"}
+SKIP = {"_worker.js", "_routes.json", "_redirects", "_headers", "404.html"}
 UA = "draftmatrix-verify-deploy/1"
 
 
@@ -37,14 +39,14 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 OPENER = urllib.request.build_opener(NoRedirect)
 
 
-def fetch(url):
-    """(status, location, body) without following redirects; status 0 on network errors."""
+def fetch(url, header="location"):
+    """(status, header value, body) without following redirects; status 0 on network errors."""
     req = urllib.request.Request(url, headers={"user-agent": UA, "cache-control": "no-cache"})
     try:
         with OPENER.open(req, timeout=30) as r:
-            return r.status, r.headers.get("location"), r.read()
+            return r.status, r.headers.get(header), r.read()
     except urllib.error.HTTPError as e:
-        return e.code, e.headers.get("location"), e.read()
+        return e.code, e.headers.get(header), e.read()
     except (urllib.error.URLError, OSError) as e:
         ERRORS.add(str(getattr(e, "reason", e)))
         return 0, None, b""
@@ -123,6 +125,27 @@ def redirect_cases(dist):
     return cases
 
 
+def header_cases(dist):
+    """(sample file path, expected Cache-Control) per /assets/<dir>/* rule in dist/_headers."""
+    f = dist / "_headers"
+    cases, pattern = [], None
+    for line in f.read_text().splitlines() if f.exists() else []:
+        if line and not line[0].isspace():
+            pattern = line.strip()
+        elif line.strip().lower().startswith("cache-control:") and pattern and pattern.endswith("/*"):
+            folder = dist / pattern.strip("/")[:-2]
+            sample = next((p for p in sorted(folder.rglob("*")) if p.is_file()), None)
+            if sample:
+                cases.append(("/" + sample.relative_to(dist).as_posix(), line.split(":", 1)[1].strip()))
+    return cases
+
+
+def check_header(base, path, want):
+    status, got, _ = fetch(base + urllib.parse.quote(path), "cache-control")
+    ok = status == 200 and got == want
+    return (path + " cache-control", base + path, f"{status} {got}", label(status, ok, bad=f"WANT {want}"), ok)
+
+
 def check_redirect(base, src, code, dst, final=None):
     """src must answer code -> dst; if final is set, dst itself must then answer final (no further hop)."""
     status, location, _ = fetch(base + src)
@@ -151,9 +174,10 @@ def main():
 
     with ThreadPoolExecutor(max_workers=8) as pool:
         rows = list(pool.map(lambda rel: check_file(base, dist, rel), files))
-        rows += list(pool.map(lambda p: check_hidden(base, p), ["/_redirects", "/_routes.json"]))
+        rows += list(pool.map(lambda p: check_hidden(base, p), ["/_redirects", "/_routes.json", "/_headers"]))
         rows.append(check_missing(base, dist))
         rows += list(pool.map(lambda c: check_redirect(base, *c), redirect_cases(dist)))
+        rows += list(pool.map(lambda c: check_header(base, *c), header_cases(dist)))
 
     widths = [max(len(r[i]) for r in rows + [("path", "url", "status", "match")]) for i in range(3)]
     print(f"{'path':<{widths[0]}}  {'url':<{widths[1]}}  {'status':<{widths[2]}}  match")
