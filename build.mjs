@@ -208,6 +208,7 @@ const PAGES = [
     description:
       "DraftMatrix: Fantasy Baseball is coming in January 2027: a tiered fantasy baseball draft board for iPhone and iPad. Get the free cheat sheet each draft season.",
     og: "mlb",
+    ogAlt: "DraftMatrix: Fantasy Baseball, coming January 2027: pre-release screenshots of the tiered draft board",
     theme: "brand",
     icon: "motif", // baseball has no released app icon; the tile motif (scripts/motif_icon.py)
   },
