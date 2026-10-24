@@ -117,3 +117,12 @@ python3 scripts/verify-deploy.py dist https://draftmatrix.app   # both arguments
 ```
 
 It fetches every file in `dist/` (except `_worker.js`, `_routes.json`, `_redirects`, `_headers`) at the URL Pages serves it at, compares SHA-256 hashes, checks `/_redirects`, `/_routes.json` and `/_headers` are 404, that each `_redirects` rule answers with its code and target, and that one file per `_headers` folder rule comes back with that rule's `Cache-Control`, prints a table, and exits 1 on any failure. Build from the same commit that was deployed, or the hashes won't match. Point it at a preview URL (`https://<hash>.draftmatrix-site.pages.dev`) to check a deployment before it's on the domain.
+
+Before a deploy, it can also run against `scripts/serve-dist.mjs`, a dependency-free local server that mimics Pages static serving (pretty URLs, `_redirects`, `_headers`, the hidden files, `404.html`). It's an approximation written from memory of how Pages behaves, so a preview deploy is still the real test. It doesn't run the worker.
+
+```sh
+node scripts/serve-dist.mjs dist 8788 &
+python3 scripts/verify-deploy.py dist http://127.0.0.1:8788
+```
+
+After merging the support-page change, also spot-check on the live site that `/support`, `/hockey`, `/basketball` and `/baseball` answer 200 with the new page, that `/support.html`, `/hockey.html` (and the other two) answer one 308 to the bare path, and that `/support/` and the other trailing-slash forms answer one 301 to the bare path.
