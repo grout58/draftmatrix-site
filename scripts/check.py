@@ -48,12 +48,27 @@ Checks:
 - dist/_worker.js passes scripts/worker-test.mjs (run in node with fake KV and ASSETS).
 - dist/_redirects keeps the /draftmatrix-site rules and, for every flat page at the
   dist root, has a 301 from /x/ to /x (and there's no dist/x/index.html to loop with)
-  and a 301 from /draftmatrix-site/x.html straight to /x, ahead of the splat rule.
+  and 301s from /draftmatrix-site/x.html and /draftmatrix-site/x/ straight to /x,
+  ahead of the splat rule (one hop each).
 - dist/404.html exists (so Pages answers unknown paths with 404, not index.html),
   has <meta name="robots" content="noindex"> and no canonical/og:url, and is not in
   sitemap.xml or linked from any page.
 - functions/ is gone, and dist/ stays under the size budget.
+- SEO (check_seo): every new page has a title, a meta description, an absolute
+  og:image that exists (1200x630 PNG, same as twitter:image), twitter:card
+  summary_large_image, twitter:site @DraftMatrixApp and image alt text; every new page
+  but 404 has a canonical and og:url for its own URL (/support on the old per-sport
+  support pages hockey.html, basketball.html and baseball.html). JSON-LD is valid and exactly:
+  WebSite on the home page, SoftwareApplication (App Store name, iOS,
+  SportsApplication, the apps.apple.com/app/id<ID> URL, 0 USD offer) on /nfl/, /nba/
+  and /nhl/, none anywhere else (not baseball, legacy or 404), never with ratings or
+  reviews. sitemap.xml lists exactly the indexable pages (not 404 or the support
+  aliases); robots.txt has the Sitemap: line. Each flat page at the dist root (support
+  pages and privacy pages) has one-hop /draftmatrix-site/x.html and x/ rules ahead
+  of the splat. dist/_headers only sets a Cache-Control of at most 30 days (no
+  immutable) on the image folders under /assets/, and nothing else (no CSP).
 """
+import json
 import os
 import random
 import re
@@ -366,6 +381,131 @@ def check_files():
         fail("dist over 8 MB")
 
 
+SITE = "https://draftmatrix.app"
+# JSON-LD expected per new page (build.mjs STRUCTURED_DATA); every other HTML file has none.
+APP_LD = {"nfl/index.html": ("DraftMatrix: Fantasy Football", "6806661645", "nfl"),
+          "nba/index.html": ("DraftMatrix: Fantasy Hoops", "6814882709", "nba"),
+          "nhl/index.html": ("DraftMatrix: Fantasy Hockey", "6811083062", "nhl")}
+LD = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S)
+HEADERS_RULE = re.compile(r"/assets/(screens|icons|og|badges)/\*\n  Cache-Control: public, max-age=\d+\n")
+
+
+def page_path(page):
+    """The URL Pages serves a dist file on: x/index.html at /x/, flat x.html at /x."""
+    if page.endswith("index.html"):
+        return "/" + page[: -len("index.html")]
+    return "/" + page[: -len(".html")]
+
+
+def canonical_path(page):
+    """The canonical URL path: the old per-sport support pages point at /support."""
+    return "/support" if page in SUPPORT else page_path(page)
+
+
+def meta(html, attr, name):
+    m = re.search(rf'<meta {attr}="{re.escape(name)}" content="([^"]*)">', html)
+    return m.group(1) if m else None
+
+
+def expected_ld(page):
+    if page == "index.html":
+        return {"@context": "https://schema.org", "@type": "WebSite", "name": "DraftMatrix", "url": f"{SITE}/"}
+    if page in APP_LD:
+        name, app_id, sport = APP_LD[page]
+        return {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": name,
+                "operatingSystem": "iOS", "applicationCategory": "SportsApplication",
+                "url": f"https://apps.apple.com/app/id{app_id}", "image": f"{SITE}/assets/icons/{sport}-512.png",
+                "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}
+    return None
+
+
+def check_seo():
+    """Head tags, JSON-LD, sitemap, robots, the one-hop old-site redirects and _headers."""
+    for page in NEW:
+        html = (DIST / page).read_text()
+        head = html[: html.index("</head>")]
+        title = re.search(r"<title>([^<]+)</title>", head)
+        desc = meta(head, "name", "description")
+        # The noindex 404 needs a description for link previews, not for search results.
+        bad = [] if title and desc and (len(desc) >= 50 or page == "404.html") else ["title/description"]
+        if page != "404.html":
+            url = SITE + canonical_path(page)
+            if f'<link rel="canonical" href="{url}">' not in head or meta(head, "property", "og:url") != url:
+                bad.append("canonical/og:url")
+        og = meta(head, "property", "og:image") or ""
+        if not og.startswith(f"{SITE}/assets/og/") or not (DIST / og[len(SITE) + 1:]).is_file() or \
+                meta(head, "name", "twitter:image") != og:
+            bad.append("og:image")
+        for attr, name, want in [("property", "og:image:width", "1200"), ("property", "og:image:height", "630"),
+                                 ("property", "og:image:type", "image/png"),
+                                 ("name", "twitter:card", "summary_large_image"),
+                                 ("name", "twitter:site", "@DraftMatrixApp")]:
+            if meta(head, attr, name) != want:
+                bad.append(name)
+        if not meta(head, "property", "og:image:alt") or meta(head, "name", "twitter:image:alt") != meta(head, "property", "og:image:alt"):
+            bad.append("image alt")
+        print(f"seo head dist/{page}: {bad or 'ok'}")
+        for b in bad:
+            fail(f"{page}: {b} missing or wrong")
+
+    for f in sorted(DIST.rglob("*.html")):
+        page, html = f.relative_to(DIST).as_posix(), f.read_text()
+        blocks, want = LD.findall(html), expected_ld(page)
+        try:
+            found = [json.loads(b) for b in blocks]
+        except ValueError:
+            fail(f"{page}: JSON-LD isn't valid JSON")
+            continue
+        print(f"json-ld dist/{page}: {[d.get('@type') for d in found] or 'none'}")
+        if found != ([want] if want else []):
+            fail(f"{page}: JSON-LD {found}, expected {want}")
+        if found and html.index("application/ld+json") > html.index("</head>"):
+            fail(f"{page}: JSON-LD isn't in <head>")
+        text = " ".join(blocks)
+        # Brand scan over the values search engines may show; URLs (slugs like nba-512.png) are allowed.
+        shown = " ".join(v for v in re.findall(r'"([^"]*)"', text) if not v.startswith("http"))
+        if re.search(r"aggregateRating|review|ratingValue", text, re.I) or BRANDS.search(shown):
+            fail(f"{page}: JSON-LD has ratings, reviews or a brand name")
+
+    sitemap = (DIST / "sitemap.xml").read_text()
+    locs = re.findall(r"<loc>([^<]+)</loc>", sitemap)
+    # Indexable pages only: not 404, and not the aliases whose canonical is /support.
+    want = [SITE + page_path(p) for p in NEW if p != "404.html" and canonical_path(p) == page_path(p)] + \
+           [f"{SITE}/{out[: -len('.html')]}" for out in LEGACY.values()]
+    print(f"sitemap.xml: {len(locs)} urls")
+    if sorted(locs) != sorted(want) or len(set(locs)) != len(locs):
+        fail(f"sitemap.xml urls {locs}, expected {want}")
+    if f"Sitemap: {SITE}/sitemap.xml" not in (DIST / "robots.txt").read_text().splitlines():
+        fail("robots.txt has no Sitemap: line")
+
+    # Old GitHub Pages paths reach their page in one hop: x.html and x/ have their own rule, before the splat.
+    redirects = (DIST / "_redirects").read_text().splitlines()
+    splat = redirects.index("/draftmatrix-site/* /:splat 301")
+    for out in FLAT:
+        name = out[: -len(".html")]
+        for rule in [f"/draftmatrix-site/{name}.html /{name} 301", f"/draftmatrix-site/{name}/ /{name} 301"]:
+            if rule not in redirects[:splat]:
+                fail(f"_redirects missing {rule!r} before the splat rule")
+
+    # _headers: only a moderate Cache-Control on the image folders. Asset names aren't
+    # fingerprinted, so no immutable; no CSP or other headers; nothing on pages or /api/.
+    headers = DIST / "_headers"
+    if not headers.is_file():
+        fail("missing dist/_headers")
+        return
+    text = headers.read_text()
+    rules = HEADERS_RULE.findall(text)
+    print(f"_headers: {rules}")
+    if HEADERS_RULE.sub("", text).strip() or not rules:
+        fail("_headers has something other than Cache-Control on /assets/{screens,icons,og,badges}/*")
+    for age in map(int, re.findall(r"max-age=(\d+)", text)):
+        if age > 30 * 86400:
+            fail(f"_headers max-age {age} is over 30 days for non-fingerprinted assets")
+    for rule in rules:
+        if not any((DIST / "assets" / rule).iterdir()):
+            fail(f"_headers rule for empty /assets/{rule}/")
+
+
 def check_support(pages):
     """The four support pages built from src/pages/support.html."""
     sitemap = (DIST / "sitemap.xml").read_text()
@@ -516,6 +656,7 @@ def check_serve():
 
 if __name__ == "__main__":
     check_files()
+    check_seo()
     check_buttondown_build()
     check_import_script()
     check_worker()

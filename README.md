@@ -63,10 +63,15 @@ What ends up in `dist/`:
 | `/support` (`support.html`) | new support page for all apps (`src/pages/support.html`) |
 | `/hockey`, `/basketball`, `/baseball` (`hockey.html` etc.) | the same support page with that app's section first, its Smart App Banner (hockey, hoops) and the feedback form preselected; canonical `/support` |
 | `/privacy.html`, `/hockey-privacy.html`, `/basketball-privacy.html`, `/baseball-privacy.html` | copied, plus an added email-list section |
-| `/_redirects`, `/_routes.json`, `/sitemap.xml`, `/robots.txt` | generated |
+| `/_redirects`, `/_routes.json`, `/_headers`, `/sitemap.xml`, `/robots.txt` | generated |
 | `/_worker.js` | `src/_worker.js` |
 | `/assets/` | `assets/` plus the CSS and JS |
 
+### Head tags, structured data and caching (new pages)
+
+The shared head (`layout()` in `build.mjs`) gives every new page, the four support pages included, a title, meta description, canonical and `og:url` (its own URL, except `/support` on the per-sport support aliases below; none on the noindex 404), an absolute 1200×630 PNG `og:image` with type and alt text, `twitter:card` `summary_large_image`, `twitter:site` `@DraftMatrixApp` and `twitter:image:alt`. The home page carries `WebSite` JSON-LD, and `/nfl/`, `/nba/` and `/nhl/` carry `SoftwareApplication` JSON-LD (App Store name, iOS, `SportsApplication`, `apps.apple.com/app/id<ID>`, a 0 USD offer, never ratings or reviews; none for baseball). The first hero screenshot on each page has `fetchpriority="high"`; screenshots further down are `loading="lazy"`. The legacy privacy pages' heads aren't touched (only the inline additions above).
+
+`dist/_headers` sets `Cache-Control: public, max-age=604800` (7 days) on `/assets/screens/*`, `/assets/icons/*`, `/assets/og/*` and `/assets/badges/*`, and nothing else. Asset names aren't fingerprinted (a regenerated screenshot keeps its name), so it's a week rather than a year with `immutable`, and the CSS, JS and HTML keep Pages' default caching so a change shows up right away. It has no CSP (see Stack). `scripts/check.py` checks all of this.
 ### Support pages
 
 `src/pages/support.html` is built four times through the shared layout. The App Store support URL for every app from 2.0.3 on is `/support`; the 2.0.2 listings still link the old per-sport URLs, so those are built from the same source instead of being copied from the root:
@@ -133,15 +138,15 @@ npx wrangler@4 pages deploy dist --project-name draftmatrix-site --branch main
 /draftmatrix-site /support 301
 /draftmatrix-site/ /support 301
 /draftmatrix-site/index.html /support 301
-/draftmatrix-site/support.html /support 301      (one per flat page: support, hockey,
-/draftmatrix-site/hockey.html /hockey 301         basketball, baseball and the four
-...                                               privacy pages)
+/draftmatrix-site/support.html /support 301      (.html and / forms, one pair per flat
+/draftmatrix-site/support/ /support 301           page: support, hockey, basketball,
+...                                               baseball and the four privacy pages)
 /draftmatrix-site/* /:splat 301
 /support/ /support 301                           (and the same for every flat page)
 ...
 ```
 
-The old GitHub Pages root was the football support page, so it goes to `/support`. The old flat pages go straight to their bare paths in one hop (`/draftmatrix-site/hockey.html` → `/hockey`); before, they went through the splat to `/hockey.html` and then took Pages' 308 to `/hockey`. Everything else keeps its name through the splat. These exact rules must come before the splat; Pages uses the first rule that matches, and `scripts/check.py` checks the order.
+The old GitHub Pages root was the football support page, so it goes to `/support`. The old flat pages go straight to their bare paths in one hop: for each there are two rules, `/draftmatrix-site/hockey.html /hockey 301` and `/draftmatrix-site/hockey/ /hockey 301`; through the splat they took two (`/hockey.html`, then Pages' 308 to `/hockey`; or `/hockey/`, then the slash rule). Everything else keeps its name through the splat. These exact rules must come before the splat; Pages uses the first rule that matches, and `scripts/check.py` checks the order.
 
 There is deliberately **no** `/support -> /support.html` rule. Pages "pretty URLs" already serve `support.html` at `/support` and redirect `/support.html` to `/support`. A rule sending `/support` back to `/support.html` would loop. For the same reason the redirect targets are the bare paths (`/support`, not `/support.html`), which saves a hop. Only requests that reach Cloudflare use these rules. Old `grout58.github.io/draftmatrix-site/...` links keep going to GitHub Pages until that site is changed.
 

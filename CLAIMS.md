@@ -197,6 +197,23 @@ Not factual claims, but recorded so nothing looks like it promises more than it 
 | OG images | Real App Store screenshots and real icons (football, hoops, hockey); baseball uses the motif. Text is the same as before |
 | App Store badge | Apple's black badge, unmodified, one per app card, 44px tall |
 
+## Structured data and share tags (2026-10-23)
+
+JSON-LD in the `<head>` (`STRUCTURED_DATA` in `build.mjs`), read by search engines rather than people, so it's held to the same rules. `scripts/check.py` checks every field.
+
+| Claim | Backed by |
+|---|---|
+| Home: `WebSite`, name "DraftMatrix", url `https://draftmatrix.app/` | The site's own name and address |
+| `/nfl/`, `/nba/`, `/nhl/`: `SoftwareApplication` named "DraftMatrix: Fantasy Football", "DraftMatrix: Fantasy Hoops", "DraftMatrix: Fantasy Hockey" | App Store names: `apps/DraftBoard/AppStoreAssets/metadata.md:103`, `apps/NBADraftMatrix/AppStore/metadata.md:14`, `apps/NHLDraftMatrix/AppStore/metadata.md:15,170` (same as `APP_NAME` in `build.mjs`) |
+| `url` `https://apps.apple.com/app/id6806661645`, `…/id6814882709`, `…/id6811083062` | The App Store ids in `APP_STORE` in `build.mjs` (also the Smart App Banner ids) |
+| `operatingSystem` "iOS" | Platform, above (iPhone and iPad, iOS 17 or later) |
+| `applicationCategory` "SportsApplication" | "Primary: Sports" in each app's metadata.md (football `:17`, hoops `:26`, hockey `:26`) |
+| `offers` price 0 USD | Free to download (Pricing and Pro, above). Pro is an in-app purchase and isn't listed as an offer |
+| `image` `/assets/icons/<sport>-512.png` | The real app icons (Brand and artwork, above) |
+| No `aggregateRating` or `review` | Not used anywhere on the site (see Dropped: ratings); `check.py` fails if either appears |
+| No baseball `SoftwareApplication` | Not released, no App Store id |
+| `twitter:site` "@DraftMatrixApp" on every new page | The DraftMatrix X account, supplied by the owner |
+
 ## Dropped or changed, and why
 
 - **"Bought DraftMatrix before it was free? Pro is already yours."** Dropped from the home pricing card and the football, hoops and hockey FAQs on 2026-10-23, on the owner's instruction, until the grandfather fix has shipped in every app (see Open concerns). It is still in the submitted App Store descriptions (M-FB, M-HP, M-HK). The code that backs it, for when it returns: `ProAccess.swift:14-29, 255-268`; per-app cutoffs `apps/DraftBoard/DraftBoard/DraftMatrixApp.swift:40-51`, `apps/NBADraftMatrix/NBADraftMatrix/NBADraftMatrixApp.swift:36`, `apps/NHLDraftMatrix/NHLDraftMatrix/NHLDraftMatrixApp.swift:36-38`. To restore it, put back the `<li>` in `src/pages/home.html` and the "I paid for … before it was free" `<dt>`/`<dd>` in `src/pages/nfl.html`, `nba.html` and `nhl.html`.

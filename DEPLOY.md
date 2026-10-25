@@ -116,9 +116,9 @@ node build.mjs
 python3 scripts/verify-deploy.py dist https://draftmatrix.app   # both arguments are the defaults
 ```
 
-It fetches every file in `dist/` (except `_worker.js`, `_routes.json`, `_redirects`) at the URL Pages serves it at, compares SHA-256 hashes, checks `/_redirects` and `/_routes.json` are 404 and that each `_redirects` rule answers with its code and target, prints a table, and exits 1 on any failure. Build from the same commit that was deployed, or the hashes won't match. Point it at a preview URL (`https://<hash>.draftmatrix-site.pages.dev`) to check a deployment before it's on the domain.
+It fetches every file in `dist/` (except `_worker.js`, `_routes.json`, `_redirects`, `_headers`) at the URL Pages serves it at, compares SHA-256 hashes, checks `/_redirects`, `/_routes.json` and `/_headers` are 404, that each `_redirects` rule answers with its code and target, and that one file per `_headers` folder rule comes back with that rule's `Cache-Control`, prints a table, and exits 1 on any failure. Build from the same commit that was deployed, or the hashes won't match. Point it at a preview URL (`https://<hash>.draftmatrix-site.pages.dev`) to check a deployment before it's on the domain.
 
-Before a deploy, it can also run against `scripts/serve-dist.mjs`, a dependency-free local server that mimics Pages static serving (pretty URLs, `_redirects`, the hidden files, `404.html`). It's an approximation written from memory of how Pages behaves, so a preview deploy is still the real test. It doesn't run the worker.
+Before a deploy, it can also run against `scripts/serve-dist.mjs`, a dependency-free local server that mimics Pages static serving (pretty URLs, `_redirects`, `_headers`, the hidden files, `404.html`). It's an approximation written from memory of how Pages behaves, so a preview deploy is still the real test. It doesn't run the worker.
 
 ```sh
 node scripts/serve-dist.mjs dist 8788 &

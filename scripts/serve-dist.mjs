@@ -10,7 +10,9 @@
 // - Pretty URLs: /x serves x.html, /x.html -> 308 /x, /x/ serves x/index.html,
 //   /x/index.html -> 308 /x/, /index.html -> 308 /, and /x -> 308 /x/ when only
 //   x/index.html exists.
-// - _redirects, _routes.json and _worker.js are never served.
+// - _headers rules (an exact path or a trailing /* splat, then indented
+//   "Name: value" lines) add their headers to the 200s they match.
+// - _redirects, _headers, _routes.json and _worker.js are never served.
 // - Anything else answers 404 with dist/404.html as the body.
 // /api/* answers 404 here; scripts/worker-test.mjs covers the worker.
 
@@ -20,7 +22,7 @@ import { extname, join, resolve } from "node:path";
 
 const DIST = resolve(process.argv[2] || "dist");
 const PORT = Number(process.argv[3] || 8788);
-const HIDDEN = new Set(["/_redirects", "/_routes.json", "/_worker.js"]);
+const HIDDEN = new Set(["/_redirects", "/_headers", "/_routes.json", "/_worker.js"]);
 const TYPES = {
   ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
   ".json": "application/json", ".xml": "application/xml", ".txt": "text/plain; charset=utf-8",
@@ -32,6 +34,22 @@ const rules = existsSync(join(DIST, "_redirects"))
     .map((line) => line.trim().split(/\s+/)).filter((p) => p.length >= 2 && !p[0].startsWith("#"))
     .map(([from, to, code]) => ({ from, to, code: Number(code || 302) }))
   : [];
+
+// [{ from, headers: {name: value} }] from dist/_headers.
+const headerRules = [];
+if (existsSync(join(DIST, "_headers"))) {
+  for (const line of readFileSync(join(DIST, "_headers"), "utf8").split("\n")) {
+    if (!line.trim() || line.trim().startsWith("#")) continue;
+    if (!/^\s/.test(line)) headerRules.push({ from: line.trim(), headers: {} });
+    else if (headerRules.length) {
+      const [name, ...value] = line.trim().split(":");
+      headerRules.at(-1).headers[name.trim().toLowerCase()] = value.join(":").trim();
+    }
+  }
+}
+const extraHeaders = (path) => Object.assign({}, ...headerRules
+  .filter(({ from }) => from.endsWith("/*") ? path.startsWith(from.slice(0, -1)) : from === path)
+  .map(({ headers }) => headers));
 
 const isFile = (rel) => {
   const p = join(DIST, rel);
@@ -70,7 +88,7 @@ createServer((req, res) => {
     res.writeHead(hit.code, { location: hit.to + url.search });
     res.end();
   } else if (hit?.file) {
-    res.writeHead(200, { "content-type": TYPES[extname(hit.file)] || "application/octet-stream" });
+    res.writeHead(200, { ...extraHeaders(path), "content-type": TYPES[extname(hit.file)] || "application/octet-stream" });
     res.end(req.method === "HEAD" ? undefined : readFileSync(join(DIST, hit.file)));
   } else {
     res.writeHead(404, { "content-type": TYPES[".html"] });
