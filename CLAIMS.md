@@ -10,7 +10,7 @@ Paths are relative to `../DraftMatrix/`. Abbreviations:
 - **M-HK** = `apps/NHLDraftMatrix/AppStore/metadata.md`, 2.0.1 section, lines 186–234
 - **M-BB** = `apps/MLBDraftMatrix/AppStore/metadata.md` (pre-submission draft, no 2.0.1 section)
 
-The legacy pages' own content (`support.html`, `privacy.html`, `hockey*.html`, `basketball*.html`, `baseball*.html`) is not covered; it is copied unchanged. The sections the build adds to them are covered below under "Sections added to the legacy pages".
+The legacy privacy pages' own content (`privacy.html`, `hockey-privacy.html`, `basketball-privacy.html`, `baseball-privacy.html`) is not covered; it is copied unchanged. The old root support pages (`index.html`, `hockey.html`, `basketball.html`, `baseball.html`) are no longer copied into `dist/`; the support pages are now built from `src/pages/support.html` (see "Support page"). The sections the build adds to them are covered below under "Sections added to the legacy pages".
 
 ## Pricing and Pro (home, every sport page)
 
@@ -112,12 +112,50 @@ Not claimed: Mac or Vision Pro. No Catalyst or "Designed for iPad" setting is in
 | Planned: free download with the same Pro purchase | `Notes/freemium-plan.md:31` ("launches free"); Pro wired at `apps/MLBDraftMatrix/MLBDraftMatrix/MLBDraftMatrixApp.swift:31,38`; `apps/MLBDraftMatrix/Pro.storekit` ($4.99). The page says "planned" and gives no price |
 | Screenshots are from a pre-release build on last season's rankings | `apps/MLBDraftMatrix/AppStore/metadata.md:127-128` (2026 season fallback until 2027 ranks) |
 
+## Support page (/support, and /hockey, /basketball, /baseball)
+
+Checked 2026-10-23 against the app repos on `main` at 2.0.3 (football build 28, hoops build 12, hockey build 33; `DraftMatrixCore` at `b6b2478`). All three apps share the UI in `PK/DraftMatrixUI`, so each row holds for every app unless it says otherwise. There are no localized string files; the bold UI names are the Swift string literals. **UI** = `PK/DraftMatrixUI`.
+
+| Claim | Backed by |
+|---|---|
+| The Guide: the "?" on the board, or "Guide: how to run a draft" at the bottom of the Draft panel | `UI/Views/DraftSidebarView.swift` last section; `UI/Views/HelpView.swift` |
+| Draft panel: the gear button at the top left on iPhone, the left column on iPad | `UI/Views/BoardView.swift:106` (label "Draft panel and settings"); `UI/RootView.swift:62-68` |
+| Pro is a one-time purchase, no subscription; bought separately in each app | Pricing rows above (`Pro.storekit` NonConsumable, one product ID per app) |
+| **Restore Purchases** in the Draft panel's last section (shown without Pro) and under the buy button on the Pro screen; it syncs with the App Store | `UI/Views/DraftSidebarView.swift:392-405` (label :401); `UI/Views/PaywallView.swift:145`; `UI/Support/ProAccess.swift:182-185` (`AppStore.sync()`) |
+| With Pro the section reads "Pro — unlimited drafts" or "Pro — included with your purchase" | `DraftSidebarView.swift:395` |
+| Free: board, tiers, search, filters, Guide, marking other teams' picks, keepers, targets, first three picks to your own team across all drafts; Pro: unlimited picks to your own team | Pricing rows above; keepers `AppModel.swift:398-401` and targets `:389-392` aren't gated |
+| Live Activity on the Lock Screen and, on iPhones that have one, the Dynamic Island; starts at the first marked pick, updates per pick, ends when the roster is full, on reset or on switching drafts | `UI/Support/LiveDraftClock.swift:6-8, 21-49`; `AppModel.swift:453-462`; `PK/DraftMatrixActivity/DraftClockActivity.swift`; M-FB:131, M-HP:169, M-HK:210 |
+| No in-app switch; turned on/off with the app's **Live Activities** switch in Settings | The app only reads `ActivityAuthorizationInfo().areActivitiesEnabled` (`LiveDraftClock.swift:38`); the per-app Live Activities switch in Settings is standard iOS for apps with `NSSupportsLiveActivities` (not app code). Not claimed: anything about iPad Live Activities |
+| Clock counts every marked pick; **Teams**, **My draft slot**, **Snake draft**; **Undo** | `DraftSidebarView.swift:318-348`; `AppModel.swift:437-442, 528`; wording from the legacy hockey/baseball support FAQ |
+| Offline: opens with the built-in snapshot, refreshes, then falls back to the last downloaded rankings or the snapshot; picks saved on device | `PK/DraftMatrixCore/Engine/DraftStore.swift:242-247, 734-750, 789-861`; `AppModel.swift:172-180`; M-FB:152, M-HP:188, M-HK:229 |
+| Rankings status "Live", "Cached", "Built-in snapshot" (and football's "Last good board", not quoted); **Refresh now** | `AppModel.swift:659-679`; `ESPNRankingsProvider.swift:86-88`; `PK/DraftMatrixNHL/NHLRankedPlayer.swift:112-114`; `NFLRankingsProvider.swift:116`; `DataStatusView.swift:56-68` |
+| Restoring needs a connection to the App Store | `AppStore.sync()` is an App Store call (`ProAccess.swift:182-185`) |
+| Keepers: long-press → **Keeper…** → **My keeper** / **Another team's keeper**; "K" badge; don't move the clock; **Clear keeper** | `UI/Views/PlayerRowView.swift:146, 237-244`; `HelpView.swift:21`; M-FB:132, M-HP:170, M-HK:211 |
+| iCloud: drafts, picks, keepers, targets and roster setup sync on their own, no switch; imported CSV rankings stay on the device | iCloud key-value store (`ubiquity-kvstore-identifier` in each entitlements file); `DraftStore.swift:222, 342, 666-673, 734-760` (sync), `:128` (imports local only); `HelpView.swift:40`; M-FB:150, M-HP:186, M-HK:227. Not claimed: syncing teams, draft slot or scoring (local preferences, `AppModel.swift:87-106`) |
+| **Suggest** in the Best available section (⌘I on iPad); **Draft to my team**, **Again**; runs on device; drafting a suggestion counts as a pick | `DraftSidebarView.swift:36-52, 216-229`; `UI/Views/SuggestionCard.swift`; `AppModel.swift:470-521` (pick counted at :517); M-FB:141-144 |
+| Suggest needs iOS 26 and a device with Apple Intelligence turned on; "still downloading, try again in a few minutes" | `PK/DraftMatrixIntelligence/DraftRecommender.swift:14-27, 49`; `PK/DraftMatrixCore/Models/Suggestion.swift:45-52`; `HelpView.swift:27` |
+| CSV: **Import CSV rankings…** in Rankings; Rank, Name, Tier, Position; header optional, any order with a header, Team optional; no Tier → computed tiers; 2 MB, 2,000 rows; CSV or plain text; **Use imported rankings**, **Remove import**; picks, keepers and targets carry over | `UI/Views/DataStatusView.swift:75, 82, 97-113`; `PK/DraftMatrixCore/Engine/CustomRankingsImporter.swift:49-60, 125-127`; `HelpView.swift:39` |
+| Rankings sources (generic): football published expert tier rankings per scoring format plus public ADP and bye weeks; hoops public draft ranks and ADP (category / points), tiers on device; hockey published expert rankings blended with public ADP, positions from public rosters, tiers on device | `NFLRankingsProvider.swift`, `PK/DraftMatrixNBA/NBASport.swift:109-121`, `PK/DraftMatrixNHL/NHLRankingsService.swift:83-147`, `NHLTheme.swift:18`; publisher names left out (rule 3) |
+| Refresh on open and every 10 minutes with **Auto-refresh every 10 min**; **Scoring**: Standard, Half PPR, PPR / Categories, Points | `DataStatusView.swift:30-40, 56-68`; `NFLSport.swift:33-35`; `NBASport.swift:19-21` |
+| Hockey "F" forwards | Hockey page row above; legacy `hockey.html` FAQ |
+| **Reset** → **Reset picks (keep keepers &amp; targets)** / **Reset everything**; "Rankings stay either way, and Undo can bring the board back"; panel title → **New Draft…** | `DraftSidebarView.swift:433-482` (reset dialog :471-476) |
+| No account, ads, tracking or data collected; draft on device and in your iCloud | Pricing rows above (privacy manifests, "Data Not Collected") |
+| iPhone and iPad, iOS 17 or later; suggestions need iOS 26 | Platform rows above |
+| Baseball coming January 2027, not on the App Store yet; email list on /mlb/ | Baseball rows above |
+| Contact: support@draftmatrix.app and the feedback form; we reply by email | `SUPPORT_EMAIL` (owner-supplied); `src/feedback.js` success message "we'll reply by email". The apps have no in-app support link (no support URL or email in the Swift sources); the App Store support URL is `https://draftmatrix.app/support` for all three (football metadata.md:64, hoops :87, hockey :80) |
+
+Not claimed on the support page, on purpose:
+
+- **"Bought DraftMatrix before it was free? Pro is already yours."** Still dropped (see "Dropped or changed"). The code is on `main` for all three apps: football cutoff by original purchase date (`apps/DraftBoard/DraftBoard/DraftMatrixApp.swift:40-51`), hockey by date (`PK/DraftMatrixNHL/NHLSport.swift:106`), hoops by original build < 4 (`NBADraftMatrixApp.swift:36`), with the toast "Thanks for buying DraftMatrix — Pro is included, free." (`RootView.swift:143-145`). But 2.0.3 is still in review, and the owner's rule was to wait until the fix has shipped in every app. The FAQ only quotes the "Pro — included with your purchase" label.
+- Siri phrases (see Dropped), iPad Live Activities, which iPhones have a Dynamic Island, keyboard shortcuts other than ⌘I.
+
 ## Footer
 
 | Claim | Backed by |
 |---|---|
 | Independence disclaimer | Owner-supplied wording; matches the spirit of M-HP:193 and M-HK:234 |
 | © 2026 Grout Technology LLC | Legacy pages' footers |
+| X link: @DraftMatrixApp, https://x.com/DraftMatrixApp | Owner-supplied account (2026-10-23). A link, not a claim |
 | Apple trademark notice | Apple's App Store marketing guidelines require it wherever the badge is used |
 
 ## Signup copy (promises, not app facts)
@@ -132,9 +170,8 @@ Not claimed: Mac or Vision Pro. No Catalyst or "Designed for iPad" setting is in
 
 | Claim | Backed by |
 |---|---|
-| Support pages: email support@draftmatrix.app (primary), GitHub github.com/grout58 (secondary) | Address supplied by the owner (`SUPPORT_EMAIL` in `build.mjs`, 2026-10-23); the GitHub link is the one already on every legacy support page |
 | Privacy pages: Contact line "Questions? Email us at support@draftmatrix.app, or use the support page linked from the App Store listing.", and "ask for deletion by emailing support@draftmatrix.app or through the support page" | Owner approved showing the address on the privacy pages, and decided to drop the github.com/grout58 contact from them (both 2026-10-23). The Contact sentence is replaced in the dist copies only, between `dm-inline` markers; the legacy sources are unchanged |
-| Support pages: the feedback form sends name, email, app and message | `src/feedback.js`, `src/_worker.js` (`feedback()`) |
+| Support pages (now built, see "Support page"): the feedback form sends name, email, app and message; no GitHub contact (owner's rule, 2026-10-23) | `src/feedback.js`, `src/_worker.js` (`feedback()`) |
 | Privacy: "The DraftMatrix apps themselves still collect no data. This section covers only the optional forms on the draftmatrix.app website." | Same sources as "No account, no tracking, Data Not Collected" above; the forms exist only on the website |
 | Privacy: the email list stores the address, which sport page(s), and first and latest signup time | `src/_worker.js` `subscribe()` stores `{sport, sports, ts, firstTs}` under `email:<address>` and nothing else (`sports` is every page, `ts` the latest signup, `firstTs` the first). `worker-test.mjs` asserts the record has exactly these keys |
 | Privacy: list used only for the draft-season cheat sheet and DraftMatrix app news; never sold or shared | Owner's commitments |
@@ -176,7 +213,11 @@ Not factual claims, but recorded so nothing looks like it promises more than it 
 
 ## Open concerns
 
-- **Grandfathering is not airtight today.** Hockey's date-based fix is in 2.0.1 build 30, which was submitted 2026-10-23 and isn't live yet. Until it is approved, some $1.99 buyers of hockey builds 24+ hit the paywall. Football's date-based cutoff may only be on the local branch `fix/nfl-grandfather-paid` (`CLAUDE.md`, 2026-10-23), so a few football buyers from the minutes it sold at $1.99 on 2.0 may not be covered. The site no longer makes this claim (see Dropped). The App Store descriptions still do.
+- **The in-app paywall overstates Pro** (app copy, not the site): its bullets "Keepers, targets and Suggest Pick included" and "Every draft synced through iCloud" (`UI/Views/PaywallView.swift:77-80`) read as Pro-only, but keepers, targets, asking for a suggestion and iCloud sync are all free in code. The support page describes the code's behavior.
+- **Guide shortcut:** the Guide lists ⇧⌘H (hide drafted) in every app (`HelpView.swift:44`), but only football registers it. The site doesn't mention it.
+- **Baseball metadata support URL** is still `https://grout58.github.io/draftmatrix-site/baseball.html` (`apps/MLBDraftMatrix/AppStore/metadata.md:88`); it should be `https://draftmatrix.app/support` before submission.
+
+- **Grandfathering is not airtight today.** Hockey's date-based fix is in 2.0.1 build 30, which was submitted 2026-10-23 and isn't live yet. Until it is approved, some $1.99 buyers of hockey builds 24+ hit the paywall. Football's date-based cutoff may only be on the local branch `fix/nfl-grandfather-paid` (`CLAUDE.md`, 2026-10-23), so a few football buyers from the minutes it sold at $1.99 on 2.0 may not be covered. The site no longer makes this claim (see Dropped). The App Store descriptions still do. Update, end of 2026-10-23: on `main` at 2.0.3 the football cutoff is merged (`DraftMatrixApp.swift:40-51`) and hockey's cutoff is 2026-10-24T16:58Z (`NHLSport.swift:106`); 2.0.3 is in review, so it isn't live yet.
 - **Football listing name.** The live listing may still read "DraftMatrix" until 2.0.1 clears review. The site uses "DraftMatrix: Fantasy Football" as instructed.
 
 ## Review-guideline audit (2026-10-23)

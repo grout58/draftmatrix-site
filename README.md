@@ -7,7 +7,7 @@ The marketing and support site for the DraftMatrix apps, for Cloudflare Pages at
 - Plain HTML and one shared stylesheet (`src/site.css`). The only JavaScript is the signup form (`src/signup.js`) and the feedback form (`src/feedback.js`).
 - One dependency-free Pages worker (`src/_worker.js`, Pages "advanced mode") for the two form endpoints.
 - `build.mjs` is a dependency-free Node script. It wraps the page bodies in `src/pages/` with the shared head, header and footer, and writes the deployable site to `dist/`. No npm and no `package.json`.
-- No external fonts, analytics or tracking. The one third-party script is Cloudflare Turnstile (`https://challenges.cloudflare.com/turnstile/v0/api.js`, `async defer`), the spam check on the two forms. It loads only on pages with a form: the home and sport pages (signup) and the four support pages (feedback). The privacy pages don't load it. `scripts/check.py` enforces this.
+- No external fonts, analytics or tracking. The one third-party script is Cloudflare Turnstile (`https://challenges.cloudflare.com/turnstile/v0/api.js`, `async defer`), the spam check on the two forms. It loads only on pages with a form: the home and sport pages (signup) and the four support pages (feedback: `/support`, `/hockey`, `/basketball`, `/baseball`). The privacy pages don't load it. `scripts/check.py` enforces this.
 - There is no Content-Security-Policy today. If you add one (in a `_headers` file), Turnstile needs `script-src https://challenges.cloudflare.com` and `frame-src https://challenges.cloudflare.com`. Everything else the pages load is same-origin.
 - Dark UI throughout (`color-scheme: dark`), styled after the app icons: a dark sport-tinted background, pink `#ff5e7d` / green `#3fde9b` / blue `#4eb9ff` tier accents and chips, and a 3×3 glossy tile motif (CSS on the pages, SVG in the header next to the wordmark). The motif is a generic brand pattern, not an app icon. Text colors were checked for WCAG AA against the lightest tint (football `#284a33`) with the card overlay.
 
@@ -21,7 +21,7 @@ The marketing and support site for the DraftMatrix apps, for Cloudflare Pages at
 
 ```
 build.mjs              build script (SIGNUP_LIVE, BUTTONDOWN_LIVE, SUPPORT_EMAIL, PROVIDER, TURNSTILE_SITEKEY at the top)
-src/pages/*.html       page bodies: home, nfl, nba, nhl, mlb
+src/pages/*.html       page bodies: home, nfl, nba, nhl, mlb, support, 404
 src/site.css           shared styles (copied to dist/assets/site.css)
 src/signup.js          signup form handler (copied to dist/assets/signup.js)
 src/feedback.js        feedback form handler (copied to dist/assets/feedback.js)
@@ -34,13 +34,14 @@ scripts/og.py          regenerates assets/og/*.png (1200x630)
 scripts/export-signups.mjs   SIGNUPS KV -> signups.csv (Cloudflare REST API)
 scripts/export-feedback.mjs  FEEDBACK KV -> feedback.csv
 scripts/buttondown-import.mjs  one-time import of signups into Buttondown (off until enabled; DEPLOY.md)
-scripts/check.py       checks dist/ (legacy pages, brand scan, links, worker tests, size)
+scripts/check.py       checks dist/ (legacy pages, support pages, no GitHub, X link, brand scan, links, worker tests, size)
 scripts/worker-test.mjs  runs dist/_worker.js in node with fake KV and ASSETS
 scripts/verify-deploy.py compares a deployed site with dist/ by SHA-256 (DEPLOY.md)
+scripts/serve-dist.mjs  serves dist/ locally like Pages static serving, for verify-deploy.py
 scripts/kv-preview/    emergency-fallback API/KV deploy path (its README.md)
 .github/workflows/deploy.yml  build, check and wrangler deploy on push to main
 DEPLOY.md              how the site is deployed and the options
-*.html at the root     legacy support/privacy pages, never edited
+*.html at the root     legacy support/privacy pages, never edited (the support ones are for GitHub Pages only now)
 CLAIMS.md              every factual claim on the site and the source that backs it
 ```
 
@@ -59,22 +60,36 @@ What ends up in `dist/`:
 |---|---|
 | `/` (`index.html`) | new home page |
 | `/nfl/`, `/nba/`, `/nhl/`, `/mlb/` | new sport pages (`<slug>/index.html`) |
-| `/support.html` | the old `index.html` (football support) plus an added Contact us section |
-| `/hockey.html`, `/basketball.html`, `/baseball.html` | copied, plus an added Contact us section |
+| `/support` (`support.html`) | new support page for all apps (`src/pages/support.html`) |
+| `/hockey`, `/basketball`, `/baseball` (`hockey.html` etc.) | the same support page with that app's section first, its Smart App Banner (hockey, hoops) and the feedback form preselected; canonical `/support` |
 | `/privacy.html`, `/hockey-privacy.html`, `/basketball-privacy.html`, `/baseball-privacy.html` | copied, plus an added email-list section |
 | `/_redirects`, `/_routes.json`, `/sitemap.xml`, `/robots.txt` | generated |
 | `/_worker.js` | `src/_worker.js` |
 | `/assets/` | `assets/` plus the CSS and JS |
 
-### Sections added to the legacy pages
+### Support pages
 
-The sources at the repo root are never edited. The build copies each one and inserts one block, between `<!-- dm-added:start -->` and `<!-- dm-added:end -->`, just before the page's closing lines (the `<footer>` on `support.html` and `privacy.html`, the independence disclaimer on the others). Each block has its own small `<style>` scoped to `.dm-added`, so the rest of the page looks exactly as before. `scripts/check.py` cuts the block (and the inline additions below) out and checks that what's left is byte-identical to the source.
+`src/pages/support.html` is built four times through the shared layout. The App Store support URL for every app from 2.0.3 on is `/support`; the 2.0.2 listings still link the old per-sport URLs, so those are built from the same source instead of being copied from the root:
 
-- **Support pages: "Contact us"**, with `SUPPORT_EMAIL` (support@draftmatrix.app) as a `mailto:` link as the primary contact, then a feedback form (name optional, email, app preselected for the page, message up to 4,000 characters, honeypot) that posts to `/api/feedback`, and github.com/grout58 as a secondary contact. If `SUPPORT_EMAIL` is ever set to `null`, the section falls back to GitHub and the form and the build prints a warning (nothing placeholder-like goes into the pages).
+| dist file | Served at | First app section | Smart App Banner | Favicon / tint |
+|---|---|---|---|---|
+| `support.html` | `/support` | (football, hoops, hockey, baseball) | football, as on the old page | football icon / brand |
+| `hockey.html` | `/hockey` | hockey | hockey | hockey icon / hockey |
+| `basketball.html` | `/basketball` | hoops | hoops | hoops icon / hoops |
+| `baseball.html` | `/baseball` | baseball | none, as before | motif / brand |
+
+Each app section sits between `<!-- app:<sport> -->` and `<!-- /app:<sport> -->` in the source; `orderApps()` in `build.mjs` moves the page's own app first. `{{support:heading}}`, `{{support:focus}}` and `{{feedback:form}}` fill in the heading, the "this page covers every app" line and the feedback form (app preselected). All four have canonical `/support`, so only `/support` is in the sitemap. Section ids: `#football`, `#hoops`, `#hockey`, `#baseball`, `#faq`, `#contact`, and one id per FAQ `<details>`. These pages were chosen over redirects so that each old URL still answers 200 with no extra hop and keeps its own Smart App Banner. The contact is support@draftmatrix.app (`mailto:`) and the feedback form; there's no GitHub link, and `scripts/check.py` fails on "github" in any built page.
+
+The footer of every built page links to X, `https://x.com/DraftMatrixApp` (`rel="me noopener"`, new tab, `aria-label` that includes the visible handle, `aria-hidden` SVG logo). The legacy privacy pages have their own footer from the root files, so they don't get it.
+
+### Sections added to the legacy privacy pages
+
+The sources at the repo root are never edited. The build copies each privacy page and inserts one block, between `<!-- dm-added:start -->` and `<!-- dm-added:end -->`, just before the page's closing lines (the `<footer>` on `privacy.html`, the independence disclaimer on the others). Each block has its own small `<style>` scoped to `.dm-added`, so the rest of the page looks exactly as before. `scripts/check.py` cuts the block (and the inline additions below) out and checks that what's left is byte-identical to the source.
+
 - **Privacy pages: "Website email list and feedback form"**, dated "Added October 23, 2026", anchor `#email-list`. It opens by saying the apps still collect no data and the section covers only the website's optional forms, then lists exactly the fields the worker stores, what each is used for, retention ("until you unsubscribe or ask us to delete"), and the Turnstile note with a link to Cloudflare's privacy policy. It names where the data is stored from `PROVIDER` in `build.mjs` (now "Cloudflare, our website host"); change that when an email provider is chosen. If the worker ever stores another field, update this section in the same change. Its deletion sentence names the support email.
-- **Inline edits**, each one line between `<!-- dm-inline:start -->` and `<!-- dm-inline:end -->`: on the four privacy pages, the Contact sentence is replaced (owner's decision, 2026-10-23: no GitHub on the privacy pages) with "Email us at support@draftmatrix.app, or use the support page linked from the App Store listing.", with the email as a `mailto:` link and "support page" linking to that app's support page; on `baseball.html` and `baseball-privacy.html`, the motif favicon links just before `</head>` (those pages had no favicon). `scripts/check.py` cuts these out too (for the privacy pages it also cuts the old GitHub sentence out of the source before comparing), checks where each sits and what the new sentence says, checks no "github.com/grout58" is left on the privacy pages, and checks the email is on all eight pages with no placeholder left. The support pages keep GitHub as a secondary contact.
+- **Inline edits**, each one line between `<!-- dm-inline:start -->` and `<!-- dm-inline:end -->`: on the four privacy pages, the Contact sentence is replaced (owner's decision, 2026-10-23: no GitHub on the privacy pages) with "Email us at support@draftmatrix.app, or use the support page linked from the App Store listing.", with the email as a `mailto:` link and "support page" linking to that app's support page; on `baseball-privacy.html`, the motif favicon links just before `</head>` (it had no favicon). `scripts/check.py` cuts these out too (for the privacy pages it also cuts the old GitHub sentence out of the source before comparing), checks where each sits and what the new sentence says, checks no "github.com/grout58" is left on the privacy pages, and checks the email is on all eight pages (four support, four privacy) with no placeholder left.
 
-The legacy pages link to each other relatively (`privacy.html`, `hockey.html`), and those links still resolve because every legacy file sits at the root.
+The legacy privacy pages link relatively (`support.html`, `hockey.html`), and those links still resolve because the built support pages sit at the dist root too.
 
 To regenerate images (needs Python 3 with Pillow, and `../DraftMatrix` checked out beside this repo):
 
@@ -84,7 +99,7 @@ python3 scripts/icons.py     # app icons: 512/256/128 webp+png, 180 touch, 64 fa
 python3 scripts/og.py        # Open Graph images (needs the icons first)
 ```
 
-`scripts/icons.py` reads the 1024px App Store icons from `.work/icon-nfl-1024.png`, `icon-nba-1024.png` and `icon-nhl-1024.png`. `.work/` is not committed, so copy them there first (the current files are JPEG data with a `.png` name; Pillow reads them either way). Baseball has no released icon: there must be no `assets/icons/mlb-*`, and `scripts/check.py` fails if one appears or is referenced. The baseball page, its home card and its OG image use the tile motif instead, and `/mlb/` plus the two baseball legacy pages use the motif favicon from `python3 scripts/motif_icon.py` (no inputs; same geometry as the header SVG).
+`scripts/icons.py` reads the 1024px App Store icons from `.work/icon-nfl-1024.png`, `icon-nba-1024.png` and `icon-nhl-1024.png`. `.work/` is not committed, so copy them there first (the current files are JPEG data with a `.png` name; Pillow reads them either way). Baseball has no released icon: there must be no `assets/icons/mlb-*`, and `scripts/check.py` fails if one appears or is referenced. The baseball page, its home card and its OG image use the tile motif instead, and `/mlb/`, `/baseball` and `baseball-privacy.html` use the motif favicon from `python3 scripts/motif_icon.py` (no inputs; same geometry as the header SVG).
 
 ## Deploy
 
@@ -118,10 +133,15 @@ npx wrangler@4 pages deploy dist --project-name draftmatrix-site --branch main
 /draftmatrix-site /support 301
 /draftmatrix-site/ /support 301
 /draftmatrix-site/index.html /support 301
+/draftmatrix-site/support.html /support 301      (one per flat page: support, hockey,
+/draftmatrix-site/hockey.html /hockey 301         basketball, baseball and the four
+...                                               privacy pages)
 /draftmatrix-site/* /:splat 301
+/support/ /support 301                           (and the same for every flat page)
+...
 ```
 
-The old GitHub Pages root was the football support page, so it goes to `/support`. Every other old path keeps its name: `/draftmatrix-site/hockey.html` → `/hockey.html`, which Pages then serves at `/hockey`.
+The old GitHub Pages root was the football support page, so it goes to `/support`. The old flat pages go straight to their bare paths in one hop (`/draftmatrix-site/hockey.html` → `/hockey`); before, they went through the splat to `/hockey.html` and then took Pages' 308 to `/hockey`. Everything else keeps its name through the splat. These exact rules must come before the splat; Pages uses the first rule that matches, and `scripts/check.py` checks the order.
 
 There is deliberately **no** `/support -> /support.html` rule. Pages "pretty URLs" already serve `support.html` at `/support` and redirect `/support.html` to `/support`. A rule sending `/support` back to `/support.html` would loop. For the same reason the redirect targets are the bare paths (`/support`, not `/support.html`), which saves a hop. Only requests that reach Cloudflare use these rules. Old `grout58.github.io/draftmatrix-site/...` links keep going to GitHub Pages until that site is changed.
 
