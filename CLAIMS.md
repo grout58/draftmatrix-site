@@ -94,23 +94,33 @@ Not claimed: Mac or Vision Pro. No Catalyst or "Designed for iPad" setting is in
 | Keeps the screen awake, dark mode, iPad keyboard shortcuts | M-HK:230 |
 | All other feature rows | Same sources as above, from M-HK |
 
-## Baseball page (/mlb/)
+## Baseball page (/mlb/) and the home "Next up" band
+
+Feature rows were re-checked on 2026-10-23 against M-BB and the shared code, and against the baseball job's draft feature list (`~/swe-runs/overnight/mlb-feature-list.md`, "Implemented"). Only rows that are in both the description and the code are used. The page keeps "These are in the current pre-release build. Details may change before launch."
 
 | Claim | Backed by |
 |---|---|
-| Coming January 2027 | Owner's instruction. Now matches `CLAUDE.md` and `Notes/freemium-plan.md:31`, which say "~January" for 2027 ranks and launch |
-| Not on the App Store yet | No App Store Connect record (`apps/MLBDraftMatrix/AppStore/metadata.md:136-142`) |
+| Coming January 2027 (home band, /mlb/ hero, title, OG image; no day) | Owner's instruction. Matches `CLAUDE.md` and `Notes/freemium-plan.md:31` ("~January" for 2027 ranks and launch). The draft feature list's target day is unconfirmed, so no day is given; `scripts/check.py` fails if a new page names one |
+| "Next up" / Not on the App Store yet | No App Store Connect record (`apps/MLBDraftMatrix/AppStore/metadata.md:136-142`). No badge, store link or pre-order on /mlb/ (`check.py` enforces) |
 | Built and waiting on next season's rankings | `CLAUDE.md` app table ("Waits on 2027 ranks (~January) and the ASC record") |
-| Roto or Points | `PK/DraftMatrixMLB/MLBSport.swift:24-33`; M-BB "ROTO OR POINTS" |
-| Positions C, 1B, 2B, 3B, SS, OF, DH, SP, RP | `PK/DraftMatrixMLB/MLBSport.swift:32` |
-| Tiers on device from draft ranks blended with ADP | M-BB:41 |
+| Live fantasy baseball draft board built around tiered rankings, for iPhone and iPad | M-BB:32-33; `TARGETED_DEVICE_FAMILY = "1,2"` (Platform above) |
+| Roto (5x5 categories) or Points; board reloads and re-tiers | M-BB:39-40; `PK/DraftMatrixMLB/MLBSport.swift:23-33` |
+| Positions C, 1B, 2B, 3B, SS, OF, DH, SP, RP (also on the home band) | `PK/DraftMatrixMLB/MLBSport.swift:32` |
+| Tiers on device from draft ranks blended with ADP | M-BB:41-42 |
+| Tier counters warn when low and flag the last player | M-BB:52 |
 | Best available, roster needs | M-BB:53-54 |
-| Pick tracking, keepers, targets | M-BB "TRACK THE DRAFT" |
-| Draft clock with Live Activity | `apps/MLBDraftMatrix/DraftClock/DraftClockBundle.swift`; `NSSupportsLiveActivities` at `apps/MLBDraftMatrix/MLBDraftMatrix.xcodeproj/project.pbxproj:380` |
-| Suggest Pick on device | `apps/MLBDraftMatrix/MLBDraftMatrix/Support/MLBTheme.swift:23` |
+| Cross off, star, undo; keepers marked drafted without moving the clock | M-BB "TRACK THE DRAFT", :49 |
+| Bookmark targets; filter by position or to targets, search, hide drafted | M-BB:55-56 |
+| Draft clock (round, overall pick, picks until your turn, snake or linear) with a Live Activity on the Lock Screen and in the Dynamic Island | M-BB:47-48; `apps/MLBDraftMatrix/DraftClock/DraftClockBundle.swift`; `NSSupportsLiveActivities` at `apps/MLBDraftMatrix/MLBDraftMatrix.xcodeproj/project.pbxproj:380`; `PK/DraftMatrixActivity/DraftClockActivity.swift` |
+| Suggest Pick uses Apple Intelligence on device and explains its pick; requires iOS 26 and a device with Apple Intelligence | M-BB:59-62; `apps/MLBDraftMatrix/MLBDraftMatrix/Support/MLBTheme.swift:23`; `PK/DraftMatrixIntelligence/DraftRecommender.swift:14` (iOS 26). Same wording as the other sport pages |
+| Multiple drafts with independent boards, synced through your own iCloud | M-BB:65-66; `DraftSidebarView.swift:433-482`; `DraftStore.swift:175, 764` |
+| Import rankings from a CSV, or export the board | M-BB:67; `PK/DraftMatrixUI/Views/DataStatusView.swift:80-85` (`importCSV`), `DraftSidebarView.swift:352` (`boardCSV`) |
 | Offline snapshot, screen stays awake | M-BB:68-69 |
-| Planned: free download with the same Pro purchase | `Notes/freemium-plan.md:31` ("launches free"); Pro wired at `apps/MLBDraftMatrix/MLBDraftMatrix/MLBDraftMatrixApp.swift:31,38`; `apps/MLBDraftMatrix/Pro.storekit` ($4.99). The page says "planned" and gives no price |
+| Planned as a free download with a one-time DraftMatrix Pro purchase, no subscription | `Notes/freemium-plan.md:31` ("launches free"); Pro wired at `apps/MLBDraftMatrix/MLBDraftMatrix/MLBDraftMatrixApp.swift:31,38` (`NonConsumable` in `apps/MLBDraftMatrix/Pro.storekit`). No price and no free-tier details: the baseball app gives "one complete draft free" (`MLBDraftMatrixApp.swift:28-30`) while the shipping apps give three picks, and that's unresolved |
 | Screenshots are from a pre-release build on last season's rankings | `apps/MLBDraftMatrix/AppStore/metadata.md:127-128` (2026 season fallback until 2027 ranks) |
+| OG image (`assets/og/mlb.png`): "Coming January 2027", "A tiered draft board for your in-person baseball draft", "DraftMatrix · iPhone and iPad" | Rows above. Real pre-release App Store screenshots (`apps/MLBDraftMatrix/AppStore/2.0/iphone-6.9in-{1,3}-*.png`), the tile motif, no baseball icon (`scripts/og.py`) |
+
+Not claimed for baseball, though in the code: Siri / App Shortcuts (`AppShortcuts.swift` exists, but not in M-BB), dark mode and iPad keyboard shortcuts (M-BB:69; left out to keep the list short), the setup guide.
 
 ## Support page (/support, and /hockey, /basketball, /baseball)
 
@@ -194,7 +204,7 @@ Not factual claims, but recorded so nothing looks like it promises more than it 
 | Baseball: no icon anywhere | No baseball icon has been released. `assets/icons/mlb-*` was removed, and `check.py` fails if one returns. The baseball page, card and OG image use the brand tile motif on the neutral `#0b0f14`→`#1d2430` background. `/mlb/` and the dist copies of `baseball.html` / `baseball-privacy.html` use a motif favicon and touch icon (`assets/icons/motif.svg`, `motif-64.png`, `motif-180.png`, drawn by `scripts/motif_icon.py`), not the football icon and not a baseball app icon |
 | The tile motif (CSS, header SVG, OG drawings) | A generic brand pattern after the icons' tier grid, with no sport ball. It's decorative (`aria-hidden`) and not presented as an app icon |
 | "Tier 1 / Tier 2 / Tier 3" chips and section chips ("In person", "The apps", "Pricing", "Features", "Screenshots", "FAQ", "Planned") | Decorative labels (the hero chips are `aria-hidden`). They make no claim |
-| OG images | Real App Store screenshots and real icons (football, hoops, hockey); baseball uses the motif. Text is the same as before |
+| OG images | Real App Store screenshots and real icons (football, hoops, hockey); baseball uses the motif. The baseball card's tier chips are replaced by a green "Coming January 2027" pill (2026-10-23); the other cards are unchanged |
 | App Store badge | Apple's black badge, unmodified, one per app card, 44px tall |
 
 ## Structured data and share tags (2026-10-23)
