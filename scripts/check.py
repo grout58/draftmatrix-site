@@ -554,7 +554,7 @@ def check_support(pages):
         for app_id in ["6806661645", "6814882709", "6811083062"]:
             if f'href="https://apps.apple.com/us/app/id{app_id}"' not in main:
                 problems.append(f"no App Store link for id{app_id}")
-        for privacy in ["/privacy.html", "/basketball-privacy.html", "/hockey-privacy.html", "/baseball-privacy.html"]:
+        for privacy in ["/privacy", "/basketball-privacy", "/hockey-privacy", "/baseball-privacy"]:
             if f'href="{privacy}"' not in main:
                 problems.append(f"no link to {privacy}")
         if 'href="/mlb/' not in main:

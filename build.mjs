@@ -126,11 +126,11 @@ const LEGACY = {
 
 // Privacy page whose email-list section each signup form links to.
 const PRIVACY = {
-  all: "/privacy.html",
-  nfl: "/privacy.html",
-  nba: "/basketball-privacy.html",
-  nhl: "/hockey-privacy.html",
-  mlb: "/baseball-privacy.html",
+  all: "/privacy",
+  nfl: "/privacy",
+  nba: "/basketball-privacy",
+  nhl: "/hockey-privacy",
+  mlb: "/baseball-privacy",
 };
 
 // Each app's section id on the support page.
@@ -467,7 +467,7 @@ function footer() {
   <div class="wrap">
     <ul>
       <li><a href="/support">Support</a></li>
-      <li><a href="/privacy.html">Privacy</a></li>
+      <li><a href="/privacy">Privacy</a></li>
       <li><a href="/nfl/">Football</a></li>
       <li><a href="/nba/">Hoops</a></li>
       <li><a href="/nhl/">Hockey</a></li>
