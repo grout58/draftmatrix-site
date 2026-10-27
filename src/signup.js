@@ -4,6 +4,7 @@
 (function () {
   var MESSAGES = {
     ok: "Thanks. You're on the list for the cheat sheet.",
+    launch: "Thanks. You're on the list for the launch.", // forms with data-ok="launch"
     notLive: "Signups open soon — this form isn't live yet.",
     invalid: "Please enter a valid email address.",
     human: "Couldn't verify you're human — please try again.",
@@ -56,7 +57,7 @@
         .then(function (res) {
           return res.json().catch(function () { return {}; }).then(function (body) {
             if (res.status === 200 && body.ok === true) {
-              show(status, MESSAGES.ok, "ok");
+              show(status, MESSAGES[form.dataset.ok] || MESSAGES.ok, "ok");
               form.reset();
             } else if (res.status === 503) {
               show(status, MESSAGES.notLive, "warn");
