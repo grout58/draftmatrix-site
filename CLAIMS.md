@@ -38,6 +38,21 @@ The legacy privacy pages' own content (`privacy.html`, `hockey-privacy.html`, `b
 
 Not claimed: Mac or Vision Pro. No Catalyst or "Designed for iPad" setting is in the repos, so it can't be confirmed.
 
+## iPhone Duo (nfl, nba, nhl pages)
+
+Checked 2026-10-27. Only the three live apps; the baseball page (`/mlb/`) doesn't mention iPhone Duo, because that app isn't on the App Store and its build hasn't been checked.
+
+| Claim | Backed by |
+|---|---|
+| Hero tag "On the App Store · iPhone, iPad and iPhone Duo" | The live App Store listings carry 8 iPhone Duo (outer display) screenshots per app: App Store Connect API read of the `APP_IPHONE_DUO` screenshot sets, 2026-10-27. The live 2.0 release notes say "Optimized for iPhone Duo: the board adapts to both the folded and unfolded displays" (Apple's listing text, not repeated on the site) |
+| "Built with the iOS 27.1 SDK" | `DTSDKName = iphoneos27.1` in the Info.plist of the Xcode 27.1 archives of the 2.0 builds, all three apps, checked 2026-10-27 on the build Mac. What building with the 27.1 SDK means on iPhone Duo: https://developer.apple.com/iphone-duo/prepare/ |
+| On iPhone Duo's outer display it fills the screen and keeps its toolbar in a vertical bar along the side (FAQ and "What do I need?"; the claim names the outer display only) | Captures in the iPhone Duo simulator on the closed (outer) display, all three apps, 2026-10-27, saved in the audit report: the board fills the display and the toolbar buttons sit in a vertical bar along the side, nothing hidden under it |
+| "iPhone Duo" in the footer trademark notice | Apple trademark; added because the pages now name the device |
+
+Not claimed: the unfolded (inner display) layout, fold/unfold transitions, the Lock Screen draft clock (Live Activity) on iPhone Duo, anything on real hardware, and Apple Intelligence / Suggest Pick on iPhone Duo. Everything above comes from the simulator, the archives and App Store Connect. The site doesn't use the words "optimized for iPhone Duo" as its own claim (that's Apple's wording). The draft FAQ sentence "Draft clock, tiers and filters work the same as on iPhone" was dropped: the draft clock isn't checked on iPhone Duo.
+
+`<title>` and meta descriptions still say "iPhone and iPad"; left for the baseball launch pass.
+
 ## In-person / offline (home, every sport page)
 
 | Claim | Backed by |

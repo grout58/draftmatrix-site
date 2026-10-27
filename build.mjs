@@ -506,7 +506,7 @@ function footer() {
       <li>${xLink()}</li>
     </ul>
     <p>DraftMatrix is an independent draft tool, not affiliated with, endorsed by, or sponsored by any professional sports league, team, or ranking publisher.</p>
-    <p>Apple, the Apple logo, iPhone and iPad are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.</p>
+    <p>Apple, the Apple logo, iPhone, iPad and iPhone Duo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.</p>
     <p>© ${YEAR} Grout Technology LLC</p>
   </div>
 </footer>`;
