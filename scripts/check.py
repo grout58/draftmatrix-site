@@ -43,6 +43,10 @@ Checks:
   carries its own share image (absolute og:image/twitter:image to og/mlb.png, a
   1200x630 PNG, with og:image:width/height/alt and a summary_large_image card).
 - the privacy blocks don't mention data the worker no longer stores (user-agent).
+- signup copy: /mlb/ promises a launch notice (heading, blurb, lede, data-ok="launch")
+  and nothing in dist/mlb/ or dist/baseball-privacy* says "cheat"; baseball-privacy.html
+  says "a launch notice", the other privacy pages and the home, /nfl/, /nba/ and /nhl/
+  signups keep the cheat sheet copy; signup.js has both success messages.
 - Buttondown: while BUTTONDOWN_LIVE is false in build.mjs, no file in dist/ but
   _worker.js mentions Buttondown; while true, the privacy blocks name it. Either way,
   a second build with Buttondown on (DM_DIST=<temp dir> DM_BUTTONDOWN_LIVE=1, never
@@ -156,8 +160,19 @@ BD_PRIVACY = [
     "asks you to confirm your subscription by email", "handles unsubscribes (every email has an unsubscribe link)",
     BD_IP, '<a href="https://buttondown.com/legal/privacy">Buttondown\'s privacy policy</a>',
 ]
-BD_OK = "Thanks. You're on the list for the cheat sheet."
-BD_CONFIRM = "Thanks. Check your inbox and confirm your email to get on the list for the cheat sheet."
+# Signup success messages in signup.js (without, with Buttondown): the default, and
+# the baseball launch one (forms with data-ok="launch").
+BD_OK = ["Thanks. You're on the list for the cheat sheet.", "Thanks. You're on the list for the launch."]
+BD_CONFIRM = ["Thanks. Check your inbox and confirm your email to get on the list for the cheat sheet.",
+              "Thanks. Check your inbox and confirm your email to get notified when it launches."]
+# Signup copy (build.mjs SIGNUP_COPY, LIST_USE): baseball promises only a launch notice
+# (owner decision D6); every other signup page and privacy page keeps the cheat sheet copy.
+SIGNUP_OLD = ["Get the free cheat sheet each draft season",
+              "We'll email you the free cheat sheet when draft season starts."]
+SIGNUP_MLB = ["Get notified when it launches", "We'll email you when DraftMatrix: Fantasy Baseball is out.",
+              "Leave your email and we'll let you know when the app is out.", 'data-sport="mlb" data-ok="launch"']
+LIST_OLD = "We use it only to send the draft-season cheat sheet and DraftMatrix app news."
+LIST_MLB = "We use it only to send a launch notice and DraftMatrix app news."
 
 failures = []
 
@@ -596,8 +611,36 @@ def check_buttondown_copy(root, label):
         if "We never sell or share them." in block:
             fail(f"{label}/{out}: still says the email list is never shared")
     js = (root / "assets" / "signup.js").read_text()
-    if BD_CONFIRM not in js or BD_OK in js:
-        fail(f"{label}/assets/signup.js: success message doesn't ask to confirm by email")
+    for ok, confirm in zip(BD_OK, BD_CONFIRM):
+        if confirm not in js or ok in js:
+            fail(f"{label}/assets/signup.js: success message {ok!r} doesn't ask to confirm by email")
+
+
+def check_signup_copy():
+    """Baseball's signup and privacy copy promise a launch notice, not a cheat sheet;
+    the other signup pages and privacy pages keep the cheat sheet copy."""
+    mlb = (DIST / "mlb" / "index.html").read_text()
+    for s in SIGNUP_MLB:
+        if s not in mlb:
+            fail(f"mlb/index.html lacks {s!r}")
+    for f in sorted([*(DIST / "mlb").rglob("*"), *DIST.glob("baseball-privacy*")]):
+        if f.is_file() and "cheat" in f.read_text(errors="replace").lower():
+            fail(f"{f.relative_to(DIST)} mentions a cheat sheet")
+    for page in ["index.html", "nfl/index.html", "nba/index.html", "nhl/index.html"]:
+        html = (DIST / page).read_text()
+        missing = [s for s in SIGNUP_OLD if s not in html]
+        if missing or "data-ok=" in html:
+            fail(f"{page} signup copy changed: missing {missing}" if missing else f"{page} has data-ok")
+    for out in LEGACY.values():
+        block = b"".join(ADDED.findall((DIST / out).read_bytes())).decode()
+        want = LIST_MLB if out == "baseball-privacy.html" else LIST_OLD
+        if want not in block:
+            fail(f"{out} privacy block lacks {want!r}")
+    js = (DIST / "assets" / "signup.js").read_text()
+    for s in BD_CONFIRM if BUTTONDOWN_LIVE else BD_OK:
+        if s not in js:
+            fail(f"assets/signup.js lacks {s!r}")
+    print("signup copy: mlb launch notice, other sports cheat sheet")
 
 
 def check_buttondown_build():
@@ -626,7 +669,9 @@ def check_buttondown_build():
             if BUTTONDOWN_LIVE:
                 fail(f"buttondown build differs from dist/ in {rel}, with BUTTONDOWN_LIVE already true")
             elif rel.as_posix() == "assets/signup.js":
-                if b.replace(BD_CONFIRM.encode(), BD_OK.encode()) != a:
+                for ok, confirm in zip(BD_OK, BD_CONFIRM):
+                    b = b.replace(confirm.encode(), ok.encode())
+                if b != a:
                     fail("buttondown build changes more of signup.js than the success message")
             elif "privacy" in rel.name and rel.name in LEGACY.values():
                 if ADDED.sub(b"", a) != ADDED.sub(b"", b):
@@ -685,6 +730,7 @@ def check_serve():
 if __name__ == "__main__":
     check_files()
     check_seo()
+    check_signup_copy()
     check_buttondown_build()
     check_import_script()
     check_worker()

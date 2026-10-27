@@ -39,10 +39,15 @@ const BUTTONDOWN_PRIVACY = "https://buttondown.com/legal/privacy";
 // scripts/check.py also builds with Buttondown on, into a temp dir: DM_BUTTONDOWN_LIVE=1
 // counts only together with DM_DIST (the output directory), so it never changes dist/.
 const BUTTONDOWN = BUTTONDOWN_LIVE || (!!process.env.DM_DIST && process.env.DM_BUTTONDOWN_LIVE === "1");
-// The signup success message in src/signup.js, and its replacement with BUTTONDOWN on
-// (Buttondown emails a confirmation link first).
-const SIGNUP_OK = `ok: "Thanks. You're on the list for the cheat sheet."`;
-const SIGNUP_OK_CONFIRM = `ok: "Thanks. Check your inbox and confirm your email to get on the list for the cheat sheet."`;
+// The signup success messages in src/signup.js, and their replacements with BUTTONDOWN on
+// (Buttondown emails a confirmation link first). `launch` is for forms with
+// data-ok="launch" (baseball, see SIGNUP_COPY).
+const SIGNUP_OK = [
+  [`ok: "Thanks. You're on the list for the cheat sheet."`,
+    `ok: "Thanks. Check your inbox and confirm your email to get on the list for the cheat sheet."`],
+  [`launch: "Thanks. You're on the list for the launch."`,
+    `launch: "Thanks. Check your inbox and confirm your email to get notified when it launches."`],
+];
 
 // Support email: the contact on the support pages, and added to the privacy
 // pages' Contact line and deletion sentence. Required.
@@ -116,12 +121,13 @@ const IMAGE_MAX_AGE = 604800;
 
 // Legacy privacy pages: source at the repo root -> path in dist. The sources are
 // never edited; the dist copy gets the email-list section. `support` is the
-// support page its Contact line links to (relative, like the legacy links).
+// support page its Contact line links to (relative, like the legacy links), and
+// `list` the email-list use (LIST_USE) when it isn't the default.
 const LEGACY = {
   "privacy.html": { out: "privacy.html", support: "support.html" },
   "hockey-privacy.html": { out: "hockey-privacy.html", support: "hockey.html" },
   "basketball-privacy.html": { out: "basketball-privacy.html", support: "basketball.html" },
-  "baseball-privacy.html": { out: "baseball-privacy.html", support: "baseball.html", icon: "motif" },
+  "baseball-privacy.html": { out: "baseball-privacy.html", support: "baseball.html", icon: "motif", list: "launch" },
 };
 
 // Privacy page whose email-list section each signup form links to.
@@ -206,7 +212,7 @@ const PAGES = [
     nav: "mlb",
     title: "DraftMatrix: Fantasy Baseball — coming January 2027",
     description:
-      "DraftMatrix: Fantasy Baseball is coming in January 2027: a tiered fantasy baseball draft board for iPhone and iPad. Get the free cheat sheet each draft season.",
+      "DraftMatrix: Fantasy Baseball is coming in January 2027: a tiered fantasy baseball draft board for iPhone and iPad. Get notified when it launches.",
     og: "mlb",
     ogAlt: "DraftMatrix: Fantasy Baseball, coming January 2027: pre-release screenshots of the tiered draft board",
     theme: "brand",
@@ -326,14 +332,33 @@ function mark() {
 const turnstile = (theme) =>
   `<div class="cf-turnstile" data-sitekey="${TURNSTILE_SITEKEY}" data-theme="${theme}"></div>`;
 
+// Signup form copy. Baseball isn't out yet, so its form promises only a launch
+// notice (owner decision D6, 2026-10-27); `ok` picks the success message in
+// src/signup.js. Every other form uses the default.
+const SIGNUP_COPY = {
+  default: {
+    heading: "Get the free cheat sheet each draft season",
+    blurb: "We'll email you the free cheat sheet when draft season starts.",
+    button: "Sign up",
+  },
+  mlb: {
+    heading: "Get notified when it launches",
+    blurb: `We'll email you when ${APP_NAME.mlb} is out.`,
+    button: "Sign up",
+    ok: "launch",
+  },
+};
+
 let signupCount = 0;
-function signup(sport, heading = "Get the free cheat sheet each draft season") {
+function signup(sport, heading) {
+  const copy = SIGNUP_COPY[sport] ?? SIGNUP_COPY.default;
   const id = `signup-${++signupCount}`;
   const note = SIGNUP_LIVE ? "" : `\n    <p class="signup-note">Preview: signups aren't live yet.</p>`;
+  const ok = copy.ok ? ` data-ok="${copy.ok}"` : "";
   return `<div class="signup-box">
-    <h2 id="${id}-h">${esc(heading)}</h2>
-    <p class="muted">We'll email you the free cheat sheet when draft season starts.</p>
-    <form class="signup-form" action="/api/subscribe" method="post" data-sport="${sport}" aria-labelledby="${id}-h" novalidate>
+    <h2 id="${id}-h">${esc(heading || copy.heading)}</h2>
+    <p class="muted">${esc(copy.blurb)}</p>
+    <form class="signup-form" action="/api/subscribe" method="post" data-sport="${sport}"${ok} aria-labelledby="${id}-h" novalidate>
       <label class="field" for="${id}-email">Email address
         <input id="${id}-email" name="email" type="email" autocomplete="email" inputmode="email" required>
       </label>
@@ -342,7 +367,7 @@ function signup(sport, heading = "Get the free cheat sheet each draft season") {
         <input id="${id}-company" name="company" type="text" tabindex="-1" autocomplete="off">
       </div>
       <input type="hidden" name="sport" value="${sport}">
-      <button type="submit">Sign up</button>
+      <button type="submit">${esc(copy.button)}</button>
       ${turnstile("dark")}
     </form>
     <p class="signup-status" role="status" aria-live="polite"></p>
@@ -386,8 +411,14 @@ function feedbackForm(sport) {
 // src/_worker.js (email address, sports, IP address).
 const BUTTONDOWN_EMAIL_LIST = `Your email address and sport(s) are stored with ${esc(PROVIDER)}, and sent to Buttondown, our email provider, which sends the emails, asks you to confirm your subscription by email, and handles unsubscribes (every email has an unsubscribe link). Buttondown also receives your IP address to filter spam; see <a href="${BUTTONDOWN_PRIVACY}">Buttondown's privacy policy</a>.`;
 
+// What the email list is used for, per privacy page (`list` in LEGACY).
+const LIST_USE = {
+  default: "the draft-season cheat sheet and DraftMatrix app news",
+  launch: "a launch notice and DraftMatrix app news",
+};
+
 // Must list exactly the fields src/_worker.js stores (see CLAIMS.md).
-function privacySection(support) {
+function privacySection(support, list = "default") {
   return `<section class="dm-added" aria-labelledby="email-list">
 <style>
   .dm-added { margin-top: 2.5rem; padding-top: .5rem; border-top: 1px solid #c7c7cc; }
@@ -396,7 +427,7 @@ function privacySection(support) {
 <h2 id="email-list">Website email list and feedback form</h2>
 <p><em>Added October 23, 2026</em></p>
 <p>The DraftMatrix apps themselves still collect no data. This section covers only the optional forms on the draftmatrix.app website.</p>
-<p><strong>Email list.</strong> If you sign up, we store your email address, which sport page(s) you signed up from, and when you first and most recently signed up. We use it only to send the draft-season cheat sheet and DraftMatrix app news.${BUTTONDOWN ? ` ${BUTTONDOWN_EMAIL_LIST}` : ""}</p>
+<p><strong>Email list.</strong> If you sign up, we store your email address, which sport page(s) you signed up from, and when you first and most recently signed up. We use it only to send ${LIST_USE[list]}.${BUTTONDOWN ? ` ${BUTTONDOWN_EMAIL_LIST}` : ""}</p>
 <p><strong>Feedback form.</strong> If you send feedback, we store your name (optional), your email address, the app you chose, your message, and the time you sent it. We use it only to reply to you.</p>
 <p>Both are stored with ${esc(PROVIDER)}, and kept until you unsubscribe or ask us to delete them. You can unsubscribe anytime, or ask for deletion by emailing ${MAILTO} or through the <a href="${support}">support page</a>. ${BUTTONDOWN ? "We never sell them, and share them only with the providers named here." : "We never sell or share them."}</p>
 <p>To block spam, the forms use Cloudflare Turnstile, which checks your browser when you use the forms; see <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's privacy policy</a>.</p>
@@ -570,7 +601,7 @@ function build() {
   if (!SUPPORT_EMAIL) throw new Error("SUPPORT_EMAIL must be set");
   for (const [src, page] of Object.entries(LEGACY)) {
     const html = readFileSync(join(ROOT, src), "utf8");
-    let out = replaceContact(src, inject(src, html, privacySection(page.support)), page.support);
+    let out = replaceContact(src, inject(src, html, privacySection(page.support, page.list)), page.support);
     if (page.icon) out = insertInline(src, out, out.indexOf("</head>"), iconLinks(page.icon));
     writeFileSync(join(DIST, page.out), out);
   }
@@ -578,9 +609,12 @@ function build() {
   cpSync(join(ROOT, "assets"), join(DIST, "assets"), { recursive: true });
   copyFileSync(join(ROOT, "src", "site.css"), join(DIST, "assets", "site.css"));
   if (BUTTONDOWN) {
-    const js = readFileSync(join(ROOT, "src", "signup.js"), "utf8");
-    if (!js.includes(SIGNUP_OK)) throw new Error("signup success message not found in src/signup.js");
-    writeFileSync(join(DIST, "assets", "signup.js"), js.replace(SIGNUP_OK, SIGNUP_OK_CONFIRM));
+    let js = readFileSync(join(ROOT, "src", "signup.js"), "utf8");
+    for (const [from, to] of SIGNUP_OK) {
+      if (!js.includes(from)) throw new Error(`signup success message not found in src/signup.js: ${from}`);
+      js = js.replace(from, to);
+    }
+    writeFileSync(join(DIST, "assets", "signup.js"), js);
   } else {
     copyFileSync(join(ROOT, "src", "signup.js"), join(DIST, "assets", "signup.js"));
   }
