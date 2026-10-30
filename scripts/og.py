@@ -82,7 +82,6 @@ CARDS = {
         "bg": "brand",
         "icons": [],  # no released baseball icon: the brand motif instead
         "title": "Fantasy Baseball",
-        "pill": "Coming January 2027",  # in place of the tier chips; no day, the date isn't set
         "lines": ["A tiered draft board for", "your in-person baseball draft"],
         "foot": "DraftMatrix · iPhone and iPad",
         "shots": [

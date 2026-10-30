@@ -29,8 +29,8 @@ Checks:
   and an aria-hidden SVG.
 - /mlb/, baseball.html and baseball-privacy.html use the motif favicon (assets/icons/motif*).
 - <meta name="apple-itunes-app"> appears exactly once, in <head>, with the right app id
-  on the home, /nfl/, /nba/, /nhl/, /support (football, as before), /hockey and /basketball,
-  and on no other HTML file (not baseball, privacy or 404).
+  on the home, /nfl/, /nba/, /nhl/, /mlb/, /support (football, as before), /hockey,
+  /basketball and /baseball, and on no other HTML file (not privacy or 404).
 - the new pages and the injected blocks carry no league or ranking-publisher names
   in visible text, alt/aria text or meta tags (URL slugs like /nfl/ and form values
   are not visible and are allowed).
@@ -38,15 +38,16 @@ Checks:
 - the Turnstile script loads on exactly the pages that have a form, each widget
   carries the sitekey, and it is the only third-party script.
 - there is no baseball app icon (no assets/icons/mlb-*, no reference to one).
-- baseball is unreleased: /mlb/ has no App Store badge or apps.apple.com link, no
-  new page says "pre-order", the launch is "January 2027" with no day, and /mlb/
-  carries its own share image (absolute og:image/twitter:image to og/mlb.png, a
-  1200x630 PNG, with og:image:width/height/alt and a summary_large_image card).
+- baseball is live like the other sports: /mlb/ has the App Store badge linking to
+  its app id, no new page says "pre-order" or still calls baseball coming / not on the
+  App Store, and /mlb/ carries its own share image (absolute og:image/twitter:image to
+  og/mlb.png, a 1200x630 PNG, with og:image:width/height/alt and a summary_large_image card).
 - the privacy blocks don't mention data the worker no longer stores (user-agent).
-- signup copy: /mlb/ promises a launch notice (heading, blurb, lede, data-ok="launch")
+- signup copy: /mlb/ promises only DraftMatrix news (heading, blurb, data-ok="news")
   and nothing in dist/mlb/ or dist/baseball-privacy* says "cheat"; baseball-privacy.html
-  says "a launch notice", the other privacy pages and the home, /nfl/, /nba/ and /nhl/
-  signups keep the cheat sheet copy; signup.js has both success messages.
+  says "a launch notice" (what earlier signups were promised), the other privacy pages
+  and the home, /nfl/, /nba/ and /nhl/ signups keep the cheat sheet copy; signup.js has
+  both success messages.
 - Buttondown: while BUTTONDOWN_LIVE is false in build.mjs, no file in dist/ but
   _worker.js mentions Buttondown; while true, the privacy blocks name it. Either way,
   a second build with Buttondown on (DM_DIST=<temp dir> DM_BUTTONDOWN_LIVE=1, never
@@ -68,8 +69,9 @@ Checks:
   but 404 has a canonical and og:url for its own URL (/support on the old per-sport
   support pages hockey.html, basketball.html and baseball.html). JSON-LD is valid and exactly:
   WebSite on the home page, SoftwareApplication (App Store name, iOS,
-  SportsApplication, the apps.apple.com/app/id<ID> URL, 0 USD offer) on /nfl/, /nba/
-  and /nhl/, none anywhere else (not baseball, legacy or 404), never with ratings or
+  SportsApplication, the apps.apple.com/app/id<ID> URL, 0 USD offer; no image for
+  baseball, which has no icon on the site) on /nfl/, /nba/, /nhl/ and /mlb/, none
+  anywhere else (not legacy or 404), never with ratings or
   reviews. sitemap.xml lists exactly the indexable pages (not 404 or the support
   aliases); robots.txt has the Sitemap: line. Each flat page at the dist root (support
   pages and privacy pages) has one-hop /draftmatrix-site/x.html and x/ rules ahead
@@ -119,6 +121,7 @@ BANNER = {
     "index.html": "6806661645", "nfl/index.html": "6806661645", "support.html": "6806661645",
     "nba/index.html": "6814882709", "basketball.html": "6814882709",
     "nhl/index.html": "6811083062", "hockey.html": "6811083062",
+    "mlb/index.html": "6827602441", "baseball.html": "6827602441",
 }
 SUPPORT_EMAIL = "support@draftmatrix.app"
 MAILTO = f'<a href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a>'
@@ -161,16 +164,21 @@ BD_PRIVACY = [
     BD_IP, '<a href="https://buttondown.com/legal/privacy">Buttondown\'s privacy policy</a>',
 ]
 # Signup success messages in signup.js (without, with Buttondown): the default, and
-# the baseball launch one (forms with data-ok="launch").
-BD_OK = ["Thanks. You're on the list for the cheat sheet.", "Thanks. You're on the list for the launch."]
+# the baseball one (forms with data-ok="news").
+BD_OK = ["Thanks. You're on the list for the cheat sheet.", "Thanks. You're on the list for DraftMatrix news."]
 BD_CONFIRM = ["Thanks. Check your inbox and confirm your email to get on the list for the cheat sheet.",
-              "Thanks. Check your inbox and confirm your email to get notified when it launches."]
-# Signup copy (build.mjs SIGNUP_COPY, LIST_USE): baseball promises only a launch notice
-# (owner decision D6); every other signup page and privacy page keeps the cheat sheet copy.
+              "Thanks. Check your inbox and confirm your email to get on the list for DraftMatrix news."]
+# Signup copy (build.mjs SIGNUP_COPY, LIST_USE): there's no baseball cheat sheet, so the
+# baseball form promises only DraftMatrix news; the baseball privacy page keeps "a launch
+# notice" (what earlier signups were promised, D6); every other signup page and privacy
+# page keeps the cheat sheet copy.
 SIGNUP_OLD = ["Get the free cheat sheet each draft season",
               "We'll email you the free cheat sheet when draft season starts."]
-SIGNUP_MLB = ["Get notified when it launches", "We'll email you when DraftMatrix: Fantasy Baseball is out.",
-              "Leave your email and we'll let you know when the app is out.", 'data-sport="mlb" data-ok="launch"']
+SIGNUP_MLB = ["Get DraftMatrix news by email", "We'll email you DraftMatrix app news.",
+              'data-sport="mlb" data-ok="news"']
+# Pre-launch baseball copy that must not come back on any new page.
+MLB_UNRELEASED = re.compile(r"January 2027|Jan 2027|isn't on the App Store|not on the App Store|"
+                            r"Baseball is next|baseball coming|when it launches|when it's out|planned", re.I)
 LIST_OLD = "We use it only to send the draft-season cheat sheet and DraftMatrix app news."
 LIST_MLB = "We use it only to send a launch notice and DraftMatrix app news."
 
@@ -343,18 +351,19 @@ def check_files():
         if "icons/mlb" in html:
             fail(f"{page} references a baseball app icon")
 
-    # Baseball isn't on the App Store: no badge, store link or pre-order, and no launch day.
+    # Baseball is on the App Store like the other sports: badge and store link, and
+    # no pre-launch copy left on any new page.
     mlb = pages["mlb/index.html"]
-    if "app-store-black.svg" in mlb or "apps.apple.com" in mlb:
-        fail("mlb/index.html has an App Store badge or link")
-    if "January 2027" not in visible(mlb):
-        fail("mlb/index.html doesn't say January 2027")
+    store = '<a class="badge" href="https://apps.apple.com/us/app/id6827602441"'
+    if store not in mlb or "app-store-black.svg" not in mlb:
+        fail("mlb/index.html lacks the App Store badge linking to id6827602441")
     for page in NEW:
         text = visible(pages[page])
         if re.search(r"pre-?order", text, re.I):
             fail(f"{page} mentions a pre-order")
-        if re.search(r"\bJan(uary)?\.? \d{1,2}\b", text):
-            fail(f"{page} names a baseball launch day")
+        old = MLB_UNRELEASED.search(text)
+        if old:
+            fail(f"{page} still has pre-launch baseball copy: {old.group(0)!r}")
     og = "https://draftmatrix.app/assets/og/mlb.png"
     for tag in [f'<meta property="og:image" content="{og}">', '<meta property="og:image:width" content="1200">',
                 '<meta property="og:image:height" content="630">', '<meta property="og:image:alt" content="',
@@ -428,7 +437,8 @@ SITE = "https://draftmatrix.app"
 # JSON-LD expected per new page (build.mjs STRUCTURED_DATA); every other HTML file has none.
 APP_LD = {"nfl/index.html": ("DraftMatrix: Fantasy Football", "6806661645", "nfl"),
           "nba/index.html": ("DraftMatrix: Fantasy Hoops", "6814882709", "nba"),
-          "nhl/index.html": ("DraftMatrix: Fantasy Hockey", "6811083062", "nhl")}
+          "nhl/index.html": ("DraftMatrix: Fantasy Hockey", "6811083062", "nhl"),
+          "mlb/index.html": ("DraftMatrix: Fantasy Baseball", "6827602441", "mlb")}
 LD = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S)
 HEADERS_RULE = re.compile(r"/assets/(screens|icons|og|badges)/\*\n  Cache-Control: public, max-age=\d+\n")
 
@@ -455,9 +465,11 @@ def expected_ld(page):
         return {"@context": "https://schema.org", "@type": "WebSite", "name": "DraftMatrix", "url": f"{SITE}/"}
     if page in APP_LD:
         name, app_id, sport = APP_LD[page]
+        # Baseball has no app icon on the site, so no image.
+        image = {} if sport == "mlb" else {"image": f"{SITE}/assets/icons/{sport}-512.png"}
         return {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": name,
                 "operatingSystem": "iOS", "applicationCategory": "SportsApplication",
-                "url": f"https://apps.apple.com/app/id{app_id}", "image": f"{SITE}/assets/icons/{sport}-512.png",
+                "url": f"https://apps.apple.com/app/id{app_id}", **image,
                 "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}}
     return None
 
@@ -566,7 +578,7 @@ def check_support(pages):
         for fid in faq_ids + ["contact", "faq"]:
             if html.count(f'id="{fid}"') != 1:
                 problems.append(f"id {fid!r} not exactly once")
-        for app_id in ["6806661645", "6814882709", "6811083062"]:
+        for app_id in ["6806661645", "6814882709", "6811083062", "6827602441"]:
             if f'href="https://apps.apple.com/us/app/id{app_id}"' not in main:
                 problems.append(f"no App Store link for id{app_id}")
         for privacy in ["/privacy", "/basketball-privacy", "/hockey-privacy", "/baseball-privacy"]:
@@ -617,7 +629,7 @@ def check_buttondown_copy(root, label):
 
 
 def check_signup_copy():
-    """Baseball's signup and privacy copy promise a launch notice, not a cheat sheet;
+    """Baseball's signup copy promises only DraftMatrix news, not a cheat sheet;
     the other signup pages and privacy pages keep the cheat sheet copy."""
     mlb = (DIST / "mlb" / "index.html").read_text()
     for s in SIGNUP_MLB:
@@ -640,7 +652,7 @@ def check_signup_copy():
     for s in BD_CONFIRM if BUTTONDOWN_LIVE else BD_OK:
         if s not in js:
             fail(f"assets/signup.js lacks {s!r}")
-    print("signup copy: mlb launch notice, other sports cheat sheet")
+    print("signup copy: mlb DraftMatrix news, other sports cheat sheet")
 
 
 def check_buttondown_build():

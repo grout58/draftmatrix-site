@@ -9,6 +9,7 @@ Paths are relative to `../DraftMatrix/`. Abbreviations:
 - **M-HP** = `apps/NBADraftMatrix/AppStore/metadata.md`, 2.0.1 section, lines 141–193
 - **M-HK** = `apps/NHLDraftMatrix/AppStore/metadata.md`, 2.0.1 section, lines 186–234
 - **M-BB** = `apps/MLBDraftMatrix/AppStore/metadata.md` (pre-submission draft, no 2.0.1 section)
+- **ASC-BB** = the shipped baseball listing in App Store Connect: app id 6827602441, version 1.0, description and promotional text, fetched 2026-10-30 (read only; version waiting for review, manual release). Promo text: "Free. Tiered baseball rankings, Roto or Points, 2B/SS players in both columns and a live draft clock. 2027 rankings load automatically once published." Description includes "Built for iPhone Duo: unfold for your board and your draft side by side; fold it mid-draft and pick up right where you left off". The baseball page goes live only when Jason releases 1.0 (the PR that adds this stays a draft until then)
 
 The legacy privacy pages' own content (`privacy.html`, `hockey-privacy.html`, `basketball-privacy.html`, `baseball-privacy.html`) is not covered; it is copied unchanged. The old root support pages (`index.html`, `hockey.html`, `basketball.html`, `baseball.html`) are no longer copied into `dist/`; the support pages are now built from `src/pages/support.html` (see "Support page"). The sections the build adds to them are covered below under "Sections added to the legacy pages".
 
@@ -40,7 +41,7 @@ Not claimed: Mac or Vision Pro. No Catalyst or "Designed for iPad" setting is in
 
 ## iPhone Duo (nfl, nba, nhl pages)
 
-Checked 2026-10-27. Only the three live apps; the baseball page (`/mlb/`) doesn't mention iPhone Duo, because that app isn't on the App Store and its build hasn't been checked.
+Checked 2026-10-27. Only the three live apps; baseball has its own row under "Baseball page" (2026-10-30, from ASC-BB).
 
 | Claim | Backed by |
 |---|---|
@@ -109,15 +110,19 @@ Not claimed: the unfolded (inner display) layout, fold/unfold transitions, the L
 | Keeps the screen awake, dark mode, iPad keyboard shortcuts | M-HK:230 |
 | All other feature rows | Same sources as above, from M-HK |
 
-## Baseball page (/mlb/) and the home "Next up" band
+## Baseball page (/mlb/) and the home "New" band
 
-Feature rows were re-checked on 2026-10-23 against M-BB and the shared code, and against the baseball job's draft feature list (`~/swe-runs/overnight/mlb-feature-list.md`, "Implemented"). Only rows that are in both the description and the code are used. The page keeps "These are in the current pre-release build. Details may change before launch."
+Feature rows were re-checked on 2026-10-23 against M-BB and the shared code, and against the baseball job's draft feature list (`~/swe-runs/overnight/mlb-feature-list.md`, "Implemented"). Only rows that are in both the description and the code are used. On 2026-10-30 the page went from "coming January 2027" to live (draft PR, merged only after 1.0 is released); the new rows below are sourced to ASC-BB. Build 4 (the 1.0 build) was archived from baseball `main`, the code the feature rows cite.
 
 | Claim | Backed by |
 |---|---|
-| Coming January 2027 (home band, /mlb/ hero, title, OG image; no day) | Owner's instruction. Matches `CLAUDE.md` and `Notes/freemium-plan.md:31` ("~January" for 2027 ranks and launch). The draft feature list's target day is unconfirmed, so no day is given; `scripts/check.py` fails if a new page names one |
-| "Next up" / Not on the App Store yet | No App Store Connect record (`apps/MLBDraftMatrix/AppStore/metadata.md:136-142`). No badge, store link or pre-order on /mlb/ (`check.py` enforces) |
-| Built and waiting on next season's rankings | `CLAUDE.md` app table ("Waits on 2027 ranks (~January) and the ASC record") |
+| On the App Store: badge and store link `https://apps.apple.com/us/app/id6827602441` (/mlb/ hero, home card, support card), "Get it on the App Store" link (home band), Smart App Banner on `/mlb/` and `/baseball` | ASC-BB (app id 6827602441). `APP_STORE.mlb` in `build.mjs`; `check.py` checks the badge, banner and JSON-LD |
+| "On the App Store · iPhone, iPad and iPhone Duo" (hero tag, same as the other sport pages) | ASC-BB description ("Built for iPhone Duo"); iPhone and iPad from `TARGETED_DEVICE_FAMILY` (Platform above) |
+| FAQ "Does it work on iPhone Duo?": "Yes. It's built for iPhone Duo: unfold it for your board and your draft side by side; fold it mid-draft and pick up right where you left off." | ASC-BB description, nearly word for word (owner approved the unfolded claims). Checked in Xcode Previews and the simulator only, never on a device, so nothing stronger is said. No "Made for iPhone Duo" badge (unconfirmed) |
+| FAQ "What do I need?": iOS 17 or later; Suggest Pick needs iOS 26 and Apple Intelligence | Platform rows above; Suggest Pick row below |
+| Runs on last season's rankings for now; 2027 rankings load automatically once published | ASC-BB promo text ("2027 rankings load automatically once published"); the 1.0 build ships on 2026 ranks and from November tries 2027 first |
+| Free to download; DraftMatrix Pro is a one-time purchase; no subscription; Pro for baseball is bought in this app (hero, features, home band "It's a free download") | ASC-BB promo text ("Free."); baseball price set to Free in ASC; the Pro IAP (`dev.grouttechnologyllc.DraftMatrixBaseball.pro`) is a non-consumable in ASC. No Pro price and no free-tier details (see "one complete draft free" below) |
+| Title / meta description: "fantasy baseball draft board with tiers per position, Roto or Points scoring, roster needs and a draft clock. Free on the App Store, built for in-person drafts." | Rows below; ASC-BB promo text (Free, Roto or Points, live draft clock) |
 | Live fantasy baseball draft board built around tiered rankings, for iPhone and iPad | M-BB:32-33; `TARGETED_DEVICE_FAMILY = "1,2"` (Platform above) |
 | Roto (5x5 categories) or Points; board reloads and re-tiers | M-BB:39-40; `PK/DraftMatrixMLB/MLBSport.swift:23-33` |
 | Positions C, 1B, 2B, 3B, SS, OF, DH, SP, RP (also on the home band) | `PK/DraftMatrixMLB/MLBSport.swift:32` |
@@ -131,9 +136,9 @@ Feature rows were re-checked on 2026-10-23 against M-BB and the shared code, and
 | Multiple drafts with independent boards, synced through your own iCloud | M-BB:65-66; `DraftSidebarView.swift:433-482`; `DraftStore.swift:175, 764` |
 | Import rankings from a CSV, or export the board | M-BB:67; `PK/DraftMatrixUI/Views/DataStatusView.swift:80-85` (`importCSV`), `DraftSidebarView.swift:352` (`boardCSV`) |
 | Offline snapshot, screen stays awake | M-BB:68-69 |
-| Planned as a free download with a one-time DraftMatrix Pro purchase, no subscription | `Notes/freemium-plan.md:31` ("launches free"); Pro wired at `apps/MLBDraftMatrix/MLBDraftMatrix/MLBDraftMatrixApp.swift:31,38` (`NonConsumable` in `apps/MLBDraftMatrix/Pro.storekit`). No price and no free-tier details: the baseball app gives "one complete draft free" (`MLBDraftMatrixApp.swift:28-30`) while the shipping apps give three picks, and that's unresolved |
-| Screenshots are from a pre-release build on last season's rankings | `apps/MLBDraftMatrix/AppStore/metadata.md:127-128` (2026 season fallback until 2027 ranks) |
-| OG image (`assets/og/mlb.png`): "Coming January 2027", "A tiered draft board for your in-person baseball draft", "DraftMatrix · iPhone and iPad" | Rows above. Real pre-release App Store screenshots (`apps/MLBDraftMatrix/AppStore/2.0/iphone-6.9in-{1,3}-*.png`), the tile motif, no baseball icon (`scripts/og.py`) |
+| Same pricing model: a free download with a one-time DraftMatrix Pro purchase, no subscription | ASC-BB (above); `Notes/freemium-plan.md:31` ("launches free"); Pro wired at `apps/MLBDraftMatrix/MLBDraftMatrix/MLBDraftMatrixApp.swift:31,38` (`NonConsumable` in `apps/MLBDraftMatrix/Pro.storekit`). No price and no free-tier details: the baseball app gives "one complete draft free" (`MLBDraftMatrixApp.swift:28-30`) while the shipping apps give three picks, and that's unresolved |
+| Screenshots are from a pre-release build on last season's rankings (note and alt text kept) | `apps/MLBDraftMatrix/AppStore/metadata.md:127-128` (2026 season fallback until 2027 ranks). Still the pre-release captures, so the note stays true; replacing them with the 1.0 App Store set is a follow-up |
+| OG image (`assets/og/mlb.png`): Tier 1/2/3 chips (as on the other cards), "A tiered draft board for your in-person baseball draft", "DraftMatrix · iPhone and iPad" | Rows above. Real pre-release App Store screenshots (`apps/MLBDraftMatrix/AppStore/2.0/iphone-6.9in-{1,3}-*.png`), the tile motif, no baseball icon (`scripts/og.py`). The "Coming January 2027" pill was removed 2026-10-30 and the card redrawn with `DM_APPS=… python3 scripts/og.py mlb` |
 
 Not claimed for baseball, though in the code: Siri / App Shortcuts (`AppShortcuts.swift` exists, but not in M-BB), dark mode and iPad keyboard shortcuts (M-BB:69; left out to keep the list short), the setup guide.
 
@@ -166,7 +171,7 @@ Checked 2026-10-23 against the app repos on `main` at 2.0.3 (football build 28, 
 | **Reset** → **Reset picks (keep keepers &amp; targets)** / **Reset everything**; "Rankings stay either way, and Undo can bring the board back"; panel title → **New Draft…** | `DraftSidebarView.swift:433-482` (reset dialog :471-476) |
 | No account, ads, tracking or data collected; draft on device and in your iCloud | Pricing rows above (privacy manifests, "Data Not Collected") |
 | iPhone and iPad, iOS 17 or later; suggestions need iOS 26 | Platform rows above |
-| Baseball coming January 2027, not on the App Store yet; email list on /mlb/ | Baseball rows above |
+| Baseball: "A tiered fantasy baseball draft board for Roto and Points leagues", App Store badge; baseball named in the lede, title and meta description | Baseball rows above (ASC-BB) |
 | Contact: support@draftmatrix.app and the feedback form; we reply by email | `SUPPORT_EMAIL` (owner-supplied); `src/feedback.js` success message "we'll reply by email". The apps have no in-app support link (no support URL or email in the Swift sources); the App Store support URL is `https://draftmatrix.app/support` for all three (football metadata.md:64, hoops :87, hockey :80) |
 
 Not claimed on the support page, on purpose:
@@ -187,7 +192,8 @@ Not claimed on the support page, on purpose:
 
 - "Get the free cheat sheet each draft season" is the owner's wording. Home, football, basketball and hockey only.
 - "We'll email you the free cheat sheet when draft season starts." I wrote this one. It is a commitment. Same pages only.
-- Baseball (/mlb/ and the baseball privacy page) promises only a launch notice, because no baseball cheat sheet exists. Owner-approved (D6, 2026-10-27): heading "Get notified when it launches", blurb "We'll email you when DraftMatrix: Fantasy Baseball is out.", lede "Leave your email and we'll let you know when the app is out.", meta/OG/Twitter description ending "Get notified when it launches.", success message "Thanks. You're on the list for the launch." (with Buttondown: "Thanks. Check your inbox and confirm your email to get notified when it launches."), and on the baseball privacy page "We use it only to send a launch notice and DraftMatrix app news." The other sports retain the cheat sheet copy. `build.mjs` `SIGNUP_COPY` / `LIST_USE`; `scripts/check.py` `check_signup_copy()` fails on any "cheat" in `dist/mlb/` or `dist/baseball-privacy*`.
+- Baseball /mlb/ (from 2026-10-30, live): heading "Get DraftMatrix news by email", blurb "We'll email you DraftMatrix app news.", success message "Thanks. You're on the list for DraftMatrix news." (with Buttondown: "Thanks. Check your inbox and confirm your email to get on the list for DraftMatrix news."), `data-ok="news"`. No baseball cheat sheet exists, so the sibling pages' cheat-sheet copy isn't reused; this promises less than the siblings, not more. The baseball privacy page still says "a launch notice and DraftMatrix app news", because earlier baseball signups were promised the launch notice. `check.py` fails on pre-launch baseball copy on any new page.
+- Before launch, baseball (/mlb/ and the baseball privacy page) promised only a launch notice, because no baseball cheat sheet exists. Owner-approved (D6, 2026-10-27): heading "Get notified when it launches", blurb "We'll email you when DraftMatrix: Fantasy Baseball is out.", lede "Leave your email and we'll let you know when the app is out.", meta/OG/Twitter description ending "Get notified when it launches.", success message "Thanks. You're on the list for the launch." (with Buttondown: "Thanks. Check your inbox and confirm your email to get notified when it launches."), and on the baseball privacy page "We use it only to send a launch notice and DraftMatrix app news." The other sports retain the cheat sheet copy. `build.mjs` `SIGNUP_COPY` / `LIST_USE`; `scripts/check.py` `check_signup_copy()` fails on any "cheat" in `dist/mlb/` or `dist/baseball-privacy*`.
 - "Signing up is optional, and you can unsubscribe anytime." was added in front of the next line on 2026-10-23 (owner's instruction). The unsubscribe promise depends on the email tool (see Open concerns).
 - "We only use your email for DraftMatrix emails. Privacy" under every signup form is the owner's wording. It links to `#email-list` on the matching privacy page (`/privacy.html` for home and football, then `/basketball-privacy.html`, `/hockey-privacy.html`, `/baseball-privacy.html`).
 
@@ -218,9 +224,9 @@ Not factual claims, but recorded so nothing looks like it promises more than it 
 | Sport page tints | Each icon's background: football `#07170d`→`#284a33`, hoops `#130e08`→`#2f1e13`, hockey `#071019`→`#233851` (owner-supplied values, matching the icons) |
 | Baseball: no icon anywhere | No baseball icon has been released. `assets/icons/mlb-*` was removed, and `check.py` fails if one returns. The baseball page, card and OG image use the brand tile motif on the neutral `#0b0f14`→`#1d2430` background. `/mlb/` and the dist copies of `baseball.html` / `baseball-privacy.html` use a motif favicon and touch icon (`assets/icons/motif.svg`, `motif-64.png`, `motif-180.png`, drawn by `scripts/motif_icon.py`), not the football icon and not a baseball app icon |
 | The tile motif (CSS, header SVG, OG drawings) | A generic brand pattern after the icons' tier grid, with no sport ball. It's decorative (`aria-hidden`) and not presented as an app icon |
-| "Tier 1 / Tier 2 / Tier 3" chips and section chips ("In person", "The apps", "Pricing", "Features", "Screenshots", "FAQ", "Planned") | Decorative labels (the hero chips are `aria-hidden`). They make no claim |
-| OG images | Real App Store screenshots and real icons (football, hoops, hockey); baseball uses the motif. The baseball card's tier chips are replaced by a green "Coming January 2027" pill (2026-10-23); the other cards are unchanged |
-| App Store badge | Apple's black badge, unmodified, one per app card, 44px tall |
+| "Tier 1 / Tier 2 / Tier 3" chips and section chips ("In person", "The apps", "Pricing", "Features", "Screenshots", "FAQ", "New") | Decorative labels (the hero chips are `aria-hidden`). They make no claim |
+| OG images | Real App Store screenshots and real icons (football, hoops, hockey); baseball uses the motif. The baseball card had a green "Coming January 2027" pill in place of the tier chips from 2026-10-23 to 2026-10-30; it now has the tier chips like the other cards |
+| App Store badge | Apple's black badge, unmodified, one per app card, 44px tall. The home "New" baseball band uses a text link, so the baseball card keeps the only baseball badge on the page |
 
 ## Structured data and share tags (2026-10-23)
 
@@ -229,14 +235,14 @@ JSON-LD in the `<head>` (`STRUCTURED_DATA` in `build.mjs`), read by search engin
 | Claim | Backed by |
 |---|---|
 | Home: `WebSite`, name "DraftMatrix", url `https://draftmatrix.app/` | The site's own name and address |
-| `/nfl/`, `/nba/`, `/nhl/`: `SoftwareApplication` named "DraftMatrix: Fantasy Football", "DraftMatrix: Fantasy Hoops", "DraftMatrix: Fantasy Hockey" | App Store names: `apps/DraftBoard/AppStoreAssets/metadata.md:103`, `apps/NBADraftMatrix/AppStore/metadata.md:14`, `apps/NHLDraftMatrix/AppStore/metadata.md:15,170` (same as `APP_NAME` in `build.mjs`) |
-| `url` `https://apps.apple.com/app/id6806661645`, `…/id6814882709`, `…/id6811083062` | The App Store ids in `APP_STORE` in `build.mjs` (also the Smart App Banner ids) |
+| `/nfl/`, `/nba/`, `/nhl/`, `/mlb/`: `SoftwareApplication` named "DraftMatrix: Fantasy Football", "DraftMatrix: Fantasy Hoops", "DraftMatrix: Fantasy Hockey", "DraftMatrix: Fantasy Baseball" | App Store names: `apps/DraftBoard/AppStoreAssets/metadata.md:103`, `apps/NBADraftMatrix/AppStore/metadata.md:14`, `apps/NHLDraftMatrix/AppStore/metadata.md:15,170`, ASC-BB (same as `APP_NAME` in `build.mjs`) |
+| `url` `https://apps.apple.com/app/id6806661645`, `…/id6814882709`, `…/id6811083062`, `…/id6827602441` | The App Store ids in `APP_STORE` in `build.mjs` (also the Smart App Banner ids) |
 | `operatingSystem` "iOS" | Platform, above (iPhone and iPad, iOS 17 or later) |
 | `applicationCategory` "SportsApplication" | "Primary: Sports" in each app's metadata.md (football `:17`, hoops `:26`, hockey `:26`) |
 | `offers` price 0 USD | Free to download (Pricing and Pro, above). Pro is an in-app purchase and isn't listed as an offer |
-| `image` `/assets/icons/<sport>-512.png` | The real app icons (Brand and artwork, above) |
+| `image` `/assets/icons/<sport>-512.png` (football, hoops, hockey; none for baseball, which has no icon on the site) | The real app icons (Brand and artwork, above) |
 | No `aggregateRating` or `review` | Not used anywhere on the site (see Dropped: ratings); `check.py` fails if either appears |
-| No baseball `SoftwareApplication` | Not released, no App Store id |
+| Baseball `SoftwareApplication` (0 USD offer, no image) | ASC-BB: app id 6827602441, price Free. Added 2026-10-30 for the release |
 | `twitter:site` "@DraftMatrixApp" on every new page | The DraftMatrix X account, supplied by the owner |
 
 ## Dropped or changed, and why
@@ -250,7 +256,7 @@ JSON-LD in the `<head>` (`STRUCTURED_DATA` in `build.mjs`), read by search engin
 - **Hoops "point guards, shooting guards, forwards, centers".** Replaced with PG, SG, SF, PF, C from the code.
 - **Siri phrases.** Not quoted. Siri uses each app's own name (`AppShortcuts.swift:16-24` uses `\(.applicationName)`), so the description's literal "in DraftMatrix" may not match what users say. The site says "Ask for a suggested pick or your team by voice".
 - **Mac / Vision Pro.** Not claimed (see Platform).
-- **Baseball price.** Not stated. It isn't on sale, and M-BB:145 still carries an old $1.99 note that conflicts with the free-launch plan.
+- **Baseball price.** "Free to download" is stated (ASC-BB). The Pro price isn't: it wasn't part of the fetched listing, and M-BB:145 still carries an old $1.99 note.
 - **Ratings, rankings, downloads, testimonials.** None used. The hoops "#3 for fantasy basketball draft" note in metadata.md is a search rank, not something to advertise.
 
 ## Open concerns
@@ -282,7 +288,7 @@ Checked against App Store Review Guidelines concerns (accurate marketing, privac
 - Privacy sections (`build.mjs` `privacySection`): the email list now says "which sport pages you signed up from, and when you first and most recently signed up", because `sports` holds every page and both `ts` and `firstTs` are stored. The old wording was "which sport's page … and when". Feedback now lists "the time you sent it", for `ts`, which was missing.
 - Feedback form: the email label reads "Email address (used only to reply to you)".
 - Signup forms: the note now starts "Signing up is optional, and you can unsubscribe anytime."
-- Home pricing note: "The App Store privacy label for each app on the App Store reads 'Data Not Collected.'" Baseball has no listing, so it has no label.
+- Home pricing note: "The App Store privacy label for each app on the App Store reads 'Data Not Collected.'" Baseball had no listing then; its label isn't checked yet (see the draft PR's follow-ups).
 - Baseball "Same pricing model": "with a DraftMatrix Pro one-time purchase, like the other apps". The old wording ("the same DraftMatrix Pro one-time purchase as the other apps") could be read as one purchase that unlocks every app, but Pro is unlocked separately in each app.
 
 **Borderline, needs the owner's call**

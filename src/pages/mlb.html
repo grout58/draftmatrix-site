@@ -3,16 +3,15 @@
     <div>
       <div class="hero-mark">
         {{motif:brand}}
-        <span class="tag">Next up · Not on the App Store yet</span>
+        <span class="tag">On the App Store · iPhone, iPad and iPhone Duo</span>
       </div>
       <h1>{{name:mlb}}</h1>
-      <p class="pitch">Coming January 2027, ahead of baseball draft season.</p>
-      <p class="lede">A live fantasy baseball draft board built around tiered rankings, for iPhone and iPad. The app is built and waiting on next season's rankings.</p>
-      <p>Leave your email and we'll let you know when the app is out.</p>
-      <div id="signup">
-        {{signup:mlb}}
+      <p class="lede">A live fantasy baseball draft board built around tiered rankings, for iPhone and iPad. It runs on last season's rankings for now, and 2027 rankings load automatically once they're published.</p>
+      <p class="pitch">Free to download. DraftMatrix Pro is a one-time purchase. No subscription.</p>
+      <div class="cta-row">
+        {{badge:mlb}}
+        <span class="small"><a href="/baseball">Support</a> · <a href="/baseball-privacy">Privacy policy</a></span>
       </div>
-      <p class="small"><a href="#planned">What's planned</a> · <a href="/baseball">Support</a> · <a href="/baseball-privacy">Privacy policy</a></p>
     </div>
     <div class="hero-shots">
       <img fetchpriority="high" src="/assets/screens/mlb-iphone-1.webp" width="414" height="900" alt="DraftMatrix: Fantasy Baseball pre-release build on iPhone: outfielders in tiers 1 to 4, with the pick clock at round 1, pick 1.08.">
@@ -22,12 +21,11 @@
   </div>
 </section>
 
-<section class="alt" id="planned">
+<section class="alt" id="features">
   <div class="wrap">
     <div class="section-head">
-      <p class="chips"><span class="chip t1">Planned</span></p>
-      <h2>What it's planned to be</h2>
-      <p>These are in the current pre-release build. Details may change before launch.</p>
+      <p class="chips"><span class="chip t1">Features</span></p>
+      <h2>Built for in-person drafts</h2>
     </div>
     <ul class="features">
       <li><strong>Roto or Points</strong>Switch between Roto (5x5 categories) and Points scoring, and the board reloads and re-tiers to match your league.</li>
@@ -41,7 +39,7 @@
       <li><strong>Multiple drafts, in sync</strong>Run more than one draft with independent boards, synced between your devices through your own iCloud.</li>
       <li><strong>Your own rankings</strong>Import rankings from a CSV file, or export the board.</li>
       <li><strong>Built for in-person drafts</strong>Cached rankings and a built-in snapshot keep the board going offline, and the screen stays awake.</li>
-      <li><strong>Same pricing model</strong>Planned as a free download with a one-time DraftMatrix Pro purchase, no subscription.</li>
+      <li><strong>Same pricing model</strong>A free download with a one-time DraftMatrix Pro purchase, no subscription. Pro for baseball is bought in this app.</li>
     </ul>
     <figure class="hero-shots single" style="margin-top:32px">
       <img src="/assets/screens/mlb-ipad-1.webp" width="675" height="900" loading="lazy" alt="DraftMatrix: Fantasy Baseball pre-release build on iPad: the draft panel beside shortstop and outfield columns of tiered players.">
@@ -52,7 +50,21 @@
 
 <section>
   <div class="wrap">
-    <h2>Draft another sport now</h2>
-    <p>The football, hoops and hockey apps are on the App Store today: <a href="/nfl/">{{name:nfl}}</a>, <a href="/nba/">{{name:nba}}</a> and <a href="/nhl/">{{name:nhl}}</a>.</p>
+    <p class="chips"><span class="chip t3">FAQ</span></p>
+    <h2>Questions</h2>
+    <dl class="faq">
+      <dt>Does it work on iPhone Duo?</dt>
+      <dd>Yes. It's built for iPhone Duo: unfold it for your board and your draft side by side; fold it mid-draft and pick up right where you left off.</dd>
+      <dt>What do I need?</dt>
+      <dd>An iPhone or iPad running iOS 17 or later. Suggest Pick needs iOS 26 and a device with Apple Intelligence.</dd>
+      <dt>Other sports?</dt>
+      <dd>The football, hoops and hockey apps are on the App Store too: <a href="/nfl/">{{name:nfl}}</a>, <a href="/nba/">{{name:nba}}</a> and <a href="/nhl/">{{name:nhl}}</a>.</dd>
+    </dl>
+  </div>
+</section>
+
+<section id="signup">
+  <div class="wrap">
+    {{signup:mlb}}
   </div>
 </section>
