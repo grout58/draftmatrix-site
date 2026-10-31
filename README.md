@@ -13,11 +13,11 @@ The marketing and support site for the DraftMatrix apps, for Cloudflare Pages at
 
 | Page | Tint (top → bottom) | Artwork | Favicon / touch icon |
 |---|---|---|---|
-| `/` | `#1d2430` → `#0b0f14` | tile motif, all three real icons on the app cards; tile motif on the baseball "Next up" band and card | football icon |
+| `/` | `#1d2430` → `#0b0f14` | tile motif, all three real icons on the app cards; tile motif on the baseball "New" band and card | football icon |
 | `/nfl/` | `#284a33` → `#07170d` | football icon | football icon |
 | `/nba/` | `#2f1e13` → `#130e08` | hoops icon | hoops icon |
 | `/nhl/` | `#233851` → `#071019` | hockey icon | hockey icon |
-| `/mlb/` | `#1d2430` → `#0b0f14` | tile motif (there is no baseball app icon); no App Store badge, store link or Smart App Banner | tile motif (`assets/icons/motif.svg`, `motif-64.png`, `motif-180.png`) |
+| `/mlb/` | `#1d2430` → `#0b0f14` | tile motif (there is no baseball app icon on the site); App Store badge, store link and Smart App Banner like the other sports (app id 6827602441) | tile motif (`assets/icons/motif.svg`, `motif-64.png`, `motif-180.png`) |
 
 ```
 build.mjs              build script (SIGNUP_LIVE, BUTTONDOWN_LIVE, SUPPORT_EMAIL, PROVIDER, TURNSTILE_SITEKEY at the top)
@@ -58,10 +58,10 @@ What ends up in `dist/`:
 
 | Path | Source |
 |---|---|
-| `/` (`index.html`) | new home page; a "Next up" band under the signup features baseball (coming January 2027) and links to `/mlb/` and its signup |
+| `/` (`index.html`) | new home page; a "New" band under the signup features baseball (on the App Store) and links to its App Store page and `/mlb/` |
 | `/nfl/`, `/nba/`, `/nhl/`, `/mlb/` | new sport pages (`<slug>/index.html`) |
 | `/support` (`support.html`) | new support page for all apps (`src/pages/support.html`) |
-| `/hockey`, `/basketball`, `/baseball` (`hockey.html` etc.) | the same support page with that app's section first, its Smart App Banner (hockey, hoops) and the feedback form preselected; canonical `/support` |
+| `/hockey`, `/basketball`, `/baseball` (`hockey.html` etc.) | the same support page with that app's section first, its Smart App Banner and the feedback form preselected; canonical `/support` |
 | `/privacy.html`, `/hockey-privacy.html`, `/basketball-privacy.html`, `/baseball-privacy.html` | copied, plus an added email-list section |
 | `/_redirects`, `/_routes.json`, `/_headers`, `/sitemap.xml`, `/robots.txt` | generated |
 | `/_worker.js` | `src/_worker.js` |
@@ -69,19 +69,19 @@ What ends up in `dist/`:
 
 ### Head tags, structured data and caching (new pages)
 
-The shared head (`layout()` in `build.mjs`) gives every new page, the four support pages included, a title, meta description, canonical and `og:url` (its own URL, except `/support` on the per-sport support aliases below; none on the noindex 404), an absolute 1200×630 PNG `og:image` with type and alt text, `twitter:card` `summary_large_image`, `twitter:site` `@DraftMatrixApp` and `twitter:image:alt`. The home page carries `WebSite` JSON-LD, and `/nfl/`, `/nba/` and `/nhl/` carry `SoftwareApplication` JSON-LD (App Store name, iOS, `SportsApplication`, `apps.apple.com/app/id<ID>`, a 0 USD offer, never ratings or reviews; none for baseball). The first hero screenshot on each page has `fetchpriority="high"`; screenshots further down are `loading="lazy"`. The legacy privacy pages' heads aren't touched (only the inline additions above).
+The shared head (`layout()` in `build.mjs`) gives every new page, the four support pages included, a title, meta description, canonical and `og:url` (its own URL, except `/support` on the per-sport support aliases below; none on the noindex 404), an absolute 1200×630 PNG `og:image` with type and alt text, `twitter:card` `summary_large_image`, `twitter:site` `@DraftMatrixApp` and `twitter:image:alt`. The home page carries `WebSite` JSON-LD, and `/nfl/`, `/nba/`, `/nhl/` and `/mlb/` carry `SoftwareApplication` JSON-LD (App Store name, iOS, `SportsApplication`, `apps.apple.com/app/id<ID>`, a 0 USD offer, never ratings or reviews; the app icon as `image`, except baseball, which has no icon on the site). The first hero screenshot on each page has `fetchpriority="high"`; screenshots further down are `loading="lazy"`. The legacy privacy pages' heads aren't touched (only the inline additions above).
 
 `dist/_headers` sets `Cache-Control: public, max-age=604800` (7 days) on `/assets/screens/*`, `/assets/icons/*`, `/assets/og/*` and `/assets/badges/*`, and nothing else. Asset names aren't fingerprinted (a regenerated screenshot keeps its name), so it's a week rather than a year with `immutable`, and the CSS, JS and HTML keep Pages' default caching so a change shows up right away. It has no CSP (see Stack). `scripts/check.py` checks all of this.
 ### Support pages
 
-`src/pages/support.html` is built four times through the shared layout. The App Store support URL for every app from 2.0.3 on is `/support`; the 2.0.2 listings still link the old per-sport URLs, so those are built from the same source instead of being copied from the root:
+`src/pages/support.html` is built four times through the shared layout. The App Store support URL for every app from 2.0.3 on (and baseball 1.0) is `/support`; the 2.0.2 listings still link the old per-sport URLs, so those are built from the same source instead of being copied from the root:
 
 | dist file | Served at | First app section | Smart App Banner | Favicon / tint |
 |---|---|---|---|---|
 | `support.html` | `/support` | (football, hoops, hockey, baseball) | football, as on the old page | football icon / brand |
 | `hockey.html` | `/hockey` | hockey | hockey | hockey icon / hockey |
 | `basketball.html` | `/basketball` | hoops | hoops | hoops icon / hoops |
-| `baseball.html` | `/baseball` | baseball | none, as before | motif / brand |
+| `baseball.html` | `/baseball` | baseball | baseball | motif / brand |
 
 Each app section sits between `<!-- app:<sport> -->` and `<!-- /app:<sport> -->` in the source; `orderApps()` in `build.mjs` moves the page's own app first. `{{support:heading}}`, `{{support:focus}}` and `{{feedback:form}}` fill in the heading, the "this page covers every app" line and the feedback form (app preselected). All four have canonical `/support`, so only `/support` is in the sitemap. Section ids: `#football`, `#hoops`, `#hockey`, `#baseball`, `#faq`, `#contact`, and one id per FAQ `<details>`. These pages were chosen over redirects so that each old URL still answers 200 with no extra hop and keeps its own Smart App Banner. The contact is support@draftmatrix.app (`mailto:`) and the feedback form; there's no GitHub link, and `scripts/check.py` fails on "github" in any built page.
 
@@ -104,9 +104,9 @@ python3 scripts/icons.py     # app icons: 512/256/128 webp+png, 180 touch, 64 fa
 python3 scripts/og.py        # Open Graph images (needs the icons first)
 ```
 
-From a git worktree, where `../DraftMatrix` isn't beside the repo, point the OG script at the apps directory and name the card(s) to redraw: `DM_APPS=/path/to/DraftMatrix/apps python3 scripts/og.py mlb`. The baseball card has a green "Coming January 2027" pill in place of the tier chips; it names no launch day.
+From a git worktree, where `../DraftMatrix` isn't beside the repo, point the OG script at the apps directory and name the card(s) to redraw: `DM_APPS=/path/to/DraftMatrix/apps python3 scripts/og.py mlb`. The baseball card has the tier chips like the other cards (until 2026-10-30 it had a "Coming January 2027" pill) and the tile motif in place of an icon.
 
-`scripts/icons.py` reads the 1024px App Store icons from `.work/icon-nfl-1024.png`, `icon-nba-1024.png` and `icon-nhl-1024.png`. `.work/` is not committed, so copy them there first (the current files are JPEG data with a `.png` name; Pillow reads them either way). Baseball has no released icon: there must be no `assets/icons/mlb-*`, and `scripts/check.py` fails if one appears or is referenced. The baseball page, its home card and its OG image use the tile motif instead, and `/mlb/`, `/baseball` and `baseball-privacy.html` use the motif favicon from `python3 scripts/motif_icon.py` (no inputs; same geometry as the header SVG).
+`scripts/icons.py` reads the 1024px App Store icons from `.work/icon-nfl-1024.png`, `icon-nba-1024.png` and `icon-nhl-1024.png`. `.work/` is not committed, so copy them there first (the current files are JPEG data with a `.png` name; Pillow reads them either way). Baseball has no icon on the site: there must be no `assets/icons/mlb-*`, and `scripts/check.py` fails if one appears or is referenced. The baseball page, its home card and its OG image use the tile motif instead, and `/mlb/`, `/baseball` and `baseball-privacy.html` use the motif favicon from `python3 scripts/motif_icon.py` (no inputs; same geometry as the header SVG).
 
 ## Deploy
 
@@ -221,6 +221,6 @@ npx wrangler kv key list --namespace-id <FEEDBACK id> --prefix fb: --remote
 ## Rules for copy
 
 - No professional league, team or ranking-publisher brand in anything visible: text, titles, meta descriptions, alt text. The URL slugs `/nfl/` and the others are the only exception. `scripts/check.py` scans for this.
-- Every claim must be backed by the app code or the submitted 2.0.1 App Store descriptions. Record it in `CLAIMS.md`.
+- Every claim must be backed by the app code or the submitted App Store descriptions (2.0.1 for football, hoops and hockey; baseball 1.0, app id 6827602441, fetched 2026-10-30). Record it in `CLAIMS.md`.
 - Use only real screenshots, never drawn UI. Use only the real app icons for football, hoops and hockey; never draw or invent a baseball icon.
 - App Store badges are Apple's artwork, unmodified, at least 40px tall, one per app card. The site is dark, so it uses the black badge, which has its own gray border for dark backgrounds (the white badge in `assets/badges/` is the allowed alternative).

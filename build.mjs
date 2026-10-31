@@ -40,13 +40,13 @@ const BUTTONDOWN_PRIVACY = "https://buttondown.com/legal/privacy";
 // counts only together with DM_DIST (the output directory), so it never changes dist/.
 const BUTTONDOWN = BUTTONDOWN_LIVE || (!!process.env.DM_DIST && process.env.DM_BUTTONDOWN_LIVE === "1");
 // The signup success messages in src/signup.js, and their replacements with BUTTONDOWN on
-// (Buttondown emails a confirmation link first). `launch` is for forms with
-// data-ok="launch" (baseball, see SIGNUP_COPY).
+// (Buttondown emails a confirmation link first). `news` is for forms with
+// data-ok="news" (baseball, see SIGNUP_COPY).
 const SIGNUP_OK = [
   [`ok: "Thanks. You're on the list for the cheat sheet."`,
     `ok: "Thanks. Check your inbox and confirm your email to get on the list for the cheat sheet."`],
-  [`launch: "Thanks. You're on the list for the launch."`,
-    `launch: "Thanks. Check your inbox and confirm your email to get notified when it launches."`],
+  [`news: "Thanks. You're on the list for DraftMatrix news."`,
+    `news: "Thanks. Check your inbox and confirm your email to get on the list for DraftMatrix news."`],
 ];
 
 // Support email: the contact on the support pages, and added to the privacy
@@ -70,6 +70,7 @@ const APP_STORE = {
   nfl: "https://apps.apple.com/us/app/id6806661645",
   nba: "https://apps.apple.com/us/app/id6814882709",
   nhl: "https://apps.apple.com/us/app/id6811083062",
+  mlb: "https://apps.apple.com/us/app/id6827602441",
 };
 
 // Safari's Smart App Banner, on pages with `appId` (a key of APP_STORE).
@@ -93,8 +94,9 @@ const APP_NAME = {
 const TWITTER_SITE = "@DraftMatrixApp";
 
 // JSON-LD per page path: WebSite on the home page, SoftwareApplication on the
-// three released apps' pages. Free to download (Pro is an in-app purchase), so
-// the offer is 0 USD. No ratings or review counts. No baseball (not released).
+// four released apps' pages. Free to download (Pro is an in-app purchase), so
+// the offer is 0 USD. No ratings or review counts. Baseball has no app icon on
+// the site (see README), so its entry has no image.
 const appLd = (sport) => ({
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
@@ -102,7 +104,7 @@ const appLd = (sport) => ({
   operatingSystem: "iOS",
   applicationCategory: "SportsApplication",
   url: `https://apps.apple.com/app/id${APP_STORE[sport].match(/\/id(\d+)$/)[1]}`,
-  image: `${ORIGIN}/assets/icons/${sport}-512.png`,
+  ...(sport === "mlb" ? {} : { image: `${ORIGIN}/assets/icons/${sport}-512.png` }),
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
 });
 const STRUCTURED_DATA = {
@@ -110,6 +112,7 @@ const STRUCTURED_DATA = {
   "/nfl/": appLd("nfl"),
   "/nba/": appLd("nba"),
   "/nhl/": appLd("nhl"),
+  "/mlb/": appLd("mlb"),
 };
 // "<" escaped so the JSON can't close the <script> early.
 const jsonLd = (data) =>
@@ -127,7 +130,7 @@ const LEGACY = {
   "privacy.html": { out: "privacy.html", support: "support.html" },
   "hockey-privacy.html": { out: "hockey-privacy.html", support: "hockey.html" },
   "basketball-privacy.html": { out: "basketball-privacy.html", support: "basketball.html" },
-  "baseball-privacy.html": { out: "baseball-privacy.html", support: "baseball.html", icon: "motif", list: "launch" },
+  "baseball-privacy.html": { out: "baseball-privacy.html", support: "baseball.html", icon: "motif", list: "news" },
 };
 
 // Privacy page whose email-list section each signup form links to.
@@ -160,7 +163,7 @@ const PAGES = [
     nav: "home",
     title: "DraftMatrix — tiered fantasy draft boards for iPhone and iPad",
     description:
-      "A live, tiered draft board for in-person fantasy drafts: football, hoops and hockey, with baseball coming. Free to download; DraftMatrix Pro is a one-time purchase.",
+      "A live, tiered draft board for in-person fantasy drafts: football, hoops, hockey and baseball. Free to download; DraftMatrix Pro is a one-time purchase.",
     og: "default",
     theme: "brand",
     icon: "nfl",
@@ -210,25 +213,26 @@ const PAGES = [
     out: "mlb/index.html",
     path: "/mlb/",
     nav: "mlb",
-    title: "DraftMatrix: Fantasy Baseball — coming January 2027",
+    title: "DraftMatrix: Fantasy Baseball — fantasy baseball draft board",
     description:
-      "DraftMatrix: Fantasy Baseball is coming in January 2027: a tiered fantasy baseball draft board for iPhone and iPad. Get notified when it launches.",
+      "A fantasy baseball draft board with tiers per position, Roto or Points scoring, roster needs and a draft clock. Free on the App Store, built for in-person drafts.",
     og: "mlb",
-    ogAlt: "DraftMatrix: Fantasy Baseball, coming January 2027: pre-release screenshots of the tiered draft board",
+    ogAlt: "DraftMatrix: Fantasy Baseball on the App Store: screenshots of the tiered draft board",
     theme: "brand",
-    icon: "motif", // baseball has no released app icon; the tile motif (scripts/motif_icon.py)
+    icon: "motif", // no baseball app icon on the site; the tile motif (scripts/motif_icon.py)
+    appId: "mlb",
   },
   // The support page, for all apps. /support is the App Store support URL for
-  // all three apps; its Smart App Banner stays the football one, as before.
+  // all four apps; its Smart App Banner stays the football one, as before.
   {
     src: "support.html",
     out: "support.html",
     path: "/support",
     nav: "support",
     focus: null,
-    title: "DraftMatrix Support — help for the football, hoops and hockey draft boards",
+    title: "DraftMatrix Support — help for the football, hoops, hockey and baseball draft boards",
     description:
-      "Help for DraftMatrix: Fantasy Football, Fantasy Hoops and Fantasy Hockey on iPhone and iPad: restoring Pro, the Lock Screen draft clock, offline drafting, iCloud sync and how to reach us.",
+      "Help for DraftMatrix: Fantasy Football, Fantasy Hoops, Fantasy Hockey and Fantasy Baseball on iPhone and iPad: restoring Pro, the Lock Screen draft clock, offline drafting, iCloud sync and how to reach us.",
     og: "default",
     ogAlt: "DraftMatrix",
     theme: "brand",
@@ -240,7 +244,7 @@ const PAGES = [
   ...[
     ["hockey.html", "nhl", "nhl", "nhl", "nhl"],
     ["basketball.html", "nba", "nba", "nba", "nba"],
-    ["baseball.html", "mlb", "brand", "motif", null],
+    ["baseball.html", "mlb", "brand", "motif", "mlb"],
   ].map(([out, sport, theme, icon, appId]) => ({
     src: "support.html",
     out,
@@ -249,9 +253,7 @@ const PAGES = [
     nav: "support",
     focus: sport,
     title: `${APP_NAME[sport]} Support`,
-    description: sport === "mlb"
-      ? "Support for DraftMatrix: Fantasy Baseball, coming January 2027, and for the DraftMatrix football, hoops and hockey apps on iPhone and iPad."
-      : `Help for ${APP_NAME[sport]} on iPhone and iPad: restoring Pro, the Lock Screen draft clock, offline drafting, iCloud sync and how to reach us.`,
+    description: `Help for ${APP_NAME[sport]} on iPhone and iPad: restoring Pro, the Lock Screen draft clock, offline drafting, iCloud sync and how to reach us.`,
     og: sport,
     ogAlt: APP_NAME[sport],
     theme,
@@ -302,7 +304,7 @@ function badge(sport) {
 // A real app icon (football, hoops and hockey only), webp with a png fallback.
 // Decorative: the app's name is always in the heading next to it.
 function icon(sport, px, lazy) {
-  if (!APP_STORE[sport]) throw new Error(`no released app icon for ${sport}`);
+  if (!APP_STORE[sport] || sport === "mlb") throw new Error(`no app icon on the site for ${sport}`);
   const base = `/assets/icons/${sport}`;
   return `<picture><source type="image/webp" srcset="${base}-128.webp 128w, ${base}-256.webp 256w, ${base}-512.webp 512w" sizes="${px}px">` +
     `<img class="app-icon" src="${base}-256.png" width="${px}" height="${px}" alt=""${lazy ? ' loading="lazy"' : ""}></picture>`;
@@ -332,8 +334,9 @@ function mark() {
 const turnstile = (theme) =>
   `<div class="cf-turnstile" data-sitekey="${TURNSTILE_SITEKEY}" data-theme="${theme}"></div>`;
 
-// Signup form copy. Baseball isn't out yet, so its form promises only a launch
-// notice (owner decision D6, 2026-10-27); `ok` picks the success message in
+// Signup form copy. There's no baseball cheat sheet, so the baseball form
+// promises only DraftMatrix news (it promised a launch notice before launch,
+// D6, 2026-10-27; dropped 2026-10-31); `ok` picks the success message in
 // src/signup.js. Every other form uses the default.
 const SIGNUP_COPY = {
   default: {
@@ -342,10 +345,10 @@ const SIGNUP_COPY = {
     button: "Sign up",
   },
   mlb: {
-    heading: "Get notified when it launches",
-    blurb: `We'll email you when ${APP_NAME.mlb} is out.`,
+    heading: "Get DraftMatrix news by email",
+    blurb: "We'll email you DraftMatrix app news.",
     button: "Sign up",
-    ok: "launch",
+    ok: "news",
   },
 };
 
@@ -411,10 +414,12 @@ function feedbackForm(sport) {
 // src/_worker.js (email address, sports, IP address).
 const BUTTONDOWN_EMAIL_LIST = `Your email address and sport(s) are stored with ${esc(PROVIDER)}, and sent to Buttondown, our email provider, which sends the emails, asks you to confirm your subscription by email, and handles unsubscribes (every email has an unsubscribe link). Buttondown also receives your IP address to filter spam; see <a href="${BUTTONDOWN_PRIVACY}">Buttondown's privacy policy</a>.`;
 
-// What the email list is used for, per privacy page (`list` in LEGACY).
+// What the email list is used for, per privacy page (`list` in LEGACY). Baseball
+// has no cheat sheet and promises only DraftMatrix app news, no launch notice
+// (owner decision, 2026-10-31).
 const LIST_USE = {
   default: "the draft-season cheat sheet and DraftMatrix app news",
-  launch: "a launch notice and DraftMatrix app news",
+  news: "DraftMatrix app news",
 };
 
 // Must list exactly the fields src/_worker.js stores (see CLAIMS.md).

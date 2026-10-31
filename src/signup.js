@@ -4,7 +4,7 @@
 (function () {
   var MESSAGES = {
     ok: "Thanks. You're on the list for the cheat sheet.",
-    launch: "Thanks. You're on the list for the launch.", // forms with data-ok="launch"
+    news: "Thanks. You're on the list for DraftMatrix news.", // forms with data-ok="news" (baseball)
     notLive: "Signups open soon — this form isn't live yet.",
     invalid: "Please enter a valid email address.",
     human: "Couldn't verify you're human — please try again.",
