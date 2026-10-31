@@ -44,8 +44,9 @@ Checks:
   og/mlb.png, a 1200x630 PNG, with og:image:width/height/alt and a summary_large_image card).
 - the privacy blocks don't mention data the worker no longer stores (user-agent).
 - signup copy: /mlb/ promises only DraftMatrix news (heading, blurb, data-ok="news")
-  and nothing in dist/mlb/ or dist/baseball-privacy* says "cheat"; baseball-privacy.html
-  says "a launch notice" (what earlier signups were promised), the other privacy pages
+  and nothing in dist/mlb/, dist/baseball* or signup.js's baseball message says "cheat"
+  or promises a launch notice ("launch notice", "when it launches", ...);
+  baseball-privacy.html says only "DraftMatrix app news", the other privacy pages
   and the home, /nfl/, /nba/ and /nhl/ signups keep the cheat sheet copy; signup.js has
   both success messages.
 - Buttondown: while BUTTONDOWN_LIVE is false in build.mjs, no file in dist/ but
@@ -169,9 +170,9 @@ BD_OK = ["Thanks. You're on the list for the cheat sheet.", "Thanks. You're on t
 BD_CONFIRM = ["Thanks. Check your inbox and confirm your email to get on the list for the cheat sheet.",
               "Thanks. Check your inbox and confirm your email to get on the list for DraftMatrix news."]
 # Signup copy (build.mjs SIGNUP_COPY, LIST_USE): there's no baseball cheat sheet, so the
-# baseball form promises only DraftMatrix news; the baseball privacy page keeps "a launch
-# notice" (what earlier signups were promised, D6); every other signup page and privacy
-# page keeps the cheat sheet copy.
+# baseball form and privacy page promise only DraftMatrix app news, no launch notice
+# (owner decision, 2026-10-31; D6's launch notice is gone); every other signup page and
+# privacy page keeps the cheat sheet copy.
 SIGNUP_OLD = ["Get the free cheat sheet each draft season",
               "We'll email you the free cheat sheet when draft season starts."]
 SIGNUP_MLB = ["Get DraftMatrix news by email", "We'll email you DraftMatrix app news.",
@@ -180,7 +181,10 @@ SIGNUP_MLB = ["Get DraftMatrix news by email", "We'll email you DraftMatrix app 
 MLB_UNRELEASED = re.compile(r"January 2027|Jan 2027|isn't on the App Store|not on the App Store|"
                             r"Baseball is next|baseball coming|when it launches|when it's out|planned", re.I)
 LIST_OLD = "We use it only to send the draft-season cheat sheet and DraftMatrix app news."
-LIST_MLB = "We use it only to send a launch notice and DraftMatrix app news."
+LIST_MLB = "We use it only to send DraftMatrix app news."
+# A baseball launch-notice promise, which must not appear on any baseball page.
+MLB_LAUNCH_NOTICE = re.compile(r"launch notice|when it launches|when it's out|when the app is out|"
+                               r"notified when|notify you|list for the launch", re.I)
 
 failures = []
 
@@ -629,15 +633,21 @@ def check_buttondown_copy(root, label):
 
 
 def check_signup_copy():
-    """Baseball's signup copy promises only DraftMatrix news, not a cheat sheet;
-    the other signup pages and privacy pages keep the cheat sheet copy."""
+    """Baseball's signup copy promises only DraftMatrix app news, not a cheat sheet
+    or a launch notice; the other signup pages and privacy pages keep the cheat sheet copy."""
     mlb = (DIST / "mlb" / "index.html").read_text()
     for s in SIGNUP_MLB:
         if s not in mlb:
             fail(f"mlb/index.html lacks {s!r}")
-    for f in sorted([*(DIST / "mlb").rglob("*"), *DIST.glob("baseball-privacy*")]):
-        if f.is_file() and "cheat" in f.read_text(errors="replace").lower():
+    for f in sorted([*(DIST / "mlb").rglob("*"), *DIST.glob("baseball*")]):
+        if not f.is_file():
+            continue
+        text = f.read_text(errors="replace")
+        if "cheat" in text.lower():
             fail(f"{f.relative_to(DIST)} mentions a cheat sheet")
+        notice = MLB_LAUNCH_NOTICE.search(text)
+        if notice:
+            fail(f"{f.relative_to(DIST)} promises a baseball launch notice: {notice.group(0)!r}")
     for page in ["index.html", "nfl/index.html", "nba/index.html", "nhl/index.html"]:
         html = (DIST / page).read_text()
         missing = [s for s in SIGNUP_OLD if s not in html]
@@ -652,7 +662,10 @@ def check_signup_copy():
     for s in BD_CONFIRM if BUTTONDOWN_LIVE else BD_OK:
         if s not in js:
             fail(f"assets/signup.js lacks {s!r}")
-    print("signup copy: mlb DraftMatrix news, other sports cheat sheet")
+    news = re.search(r"news: \"([^\"]*)\"", js)
+    if not news or MLB_LAUNCH_NOTICE.search(news.group(1)) or "launch" in news.group(1).lower():
+        fail(f"assets/signup.js baseball message isn't plain DraftMatrix news: {news and news.group(1)!r}")
+    print("signup copy: mlb DraftMatrix app news (no launch notice), other sports cheat sheet")
 
 
 def check_buttondown_build():

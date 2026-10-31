@@ -130,7 +130,7 @@ const LEGACY = {
   "privacy.html": { out: "privacy.html", support: "support.html" },
   "hockey-privacy.html": { out: "hockey-privacy.html", support: "hockey.html" },
   "basketball-privacy.html": { out: "basketball-privacy.html", support: "basketball.html" },
-  "baseball-privacy.html": { out: "baseball-privacy.html", support: "baseball.html", icon: "motif", list: "launch" },
+  "baseball-privacy.html": { out: "baseball-privacy.html", support: "baseball.html", icon: "motif", list: "news" },
 };
 
 // Privacy page whose email-list section each signup form links to.
@@ -336,7 +336,7 @@ const turnstile = (theme) =>
 
 // Signup form copy. There's no baseball cheat sheet, so the baseball form
 // promises only DraftMatrix news (it promised a launch notice before launch,
-// owner decision D6, 2026-10-27); `ok` picks the success message in
+// D6, 2026-10-27; dropped 2026-10-31); `ok` picks the success message in
 // src/signup.js. Every other form uses the default.
 const SIGNUP_COPY = {
   default: {
@@ -414,10 +414,12 @@ function feedbackForm(sport) {
 // src/_worker.js (email address, sports, IP address).
 const BUTTONDOWN_EMAIL_LIST = `Your email address and sport(s) are stored with ${esc(PROVIDER)}, and sent to Buttondown, our email provider, which sends the emails, asks you to confirm your subscription by email, and handles unsubscribes (every email has an unsubscribe link). Buttondown also receives your IP address to filter spam; see <a href="${BUTTONDOWN_PRIVACY}">Buttondown's privacy policy</a>.`;
 
-// What the email list is used for, per privacy page (`list` in LEGACY).
+// What the email list is used for, per privacy page (`list` in LEGACY). Baseball
+// has no cheat sheet and promises only DraftMatrix app news, no launch notice
+// (owner decision, 2026-10-31).
 const LIST_USE = {
   default: "the draft-season cheat sheet and DraftMatrix app news",
-  launch: "a launch notice and DraftMatrix app news",
+  news: "DraftMatrix app news",
 };
 
 // Must list exactly the fields src/_worker.js stores (see CLAIMS.md).
