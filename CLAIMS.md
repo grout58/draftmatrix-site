@@ -23,10 +23,13 @@ The legacy pages' own content (`support.html`, `privacy.html`, `hockey*.html`, `
 | No ads | M-FB:155, M-HP:191, M-HK:232; no ad SDKs in any app (`apps/*/*/PrivacyInfo.xcprivacy`; packages have no dependencies, `Packages/DraftMatrixCore/Package.swift`) |
 | Free: board, tiers, search, filters, draft guide | "The board, tiers, search, filters and draft guide are free" in M-FB, M-HP, M-HK (FREE TO DOWNLOAD block) |
 | Free: your first three picks to your own team, three in total across all drafts | `PK/DraftMatrixUI/Support/ProAccess.swift:68` (`freePickLimit = 3`, "across every draft"), `:73`, `:204-205`; only `toggleMine` is gated: `PK/DraftMatrixUI/AppModel.swift:367-386` |
+| A mock draft has three picks of its own and never uses the real three | `PK/DraftMatrixUI/Support/ProAccess.swift` (`mockPickIDs`, `freePicksRemaining(mock:)`, `resetMockPicks()`); `PK/DraftMatrixUI/AppModel.swift` (`claimPick`, `startMockDraft`); `ProAccessTests` mock-allowance suite |
 | Free: marking other teams' picks | `toggleTaken` is not gated: `PK/DraftMatrixUI/AppModel.swift:365` |
 | Pro: unlimited picks to your own team, in every draft | "unlocks unlimited picks in every draft" in M-FB, M-HP, M-HK |
 | Restore Purchases is in the Draft panel | `PK/DraftMatrixUI/Views/DraftSidebarView.swift:401`, `PK/DraftMatrixUI/Views/PaywallView.swift:145` |
-| No account, no tracking, "Data Not Collected" | M-FB:155, M-HP:191, M-HK:232; `NSPrivacyTracking = false` in each `PrivacyInfo.xcprivacy:5-6`; App Privacy notes in each metadata.md ("Data Not Collected") |
+| No account, no tracking; the apps send a few anonymous usage counts and never the draft | `NSPrivacyTracking = false` and the collected types (Product Interaction, Device ID; not linked, no tracking, analytics) in each `apps/*/*/PrivacyInfo.xcprivacy`; the full event list is `PK/DraftMatrixUI/Support/Analytics.swift` (`AnalyticsEvent`), sent by `TelemetryDeckSink.swift`. **The site no longer says "Data Not Collected"**; the App Privacy label changes with the first build that carries analytics |
+| Privacy pages, "Anonymous usage statistics": the events listed, the device and app details, the hashed identifier | Events: `AnalyticsEvent` cases (firstOpen, mockDraftStarted/Finished, freePickUsed, mockPickUsed, paywallShown, draftReminderSet, proPurchased, proRestored). Device details: the TelemetryDeck SwiftSDK 2.14.2 default parameters (`TelemetryDeck.AppInfo.*`, `Device.*`, `RunContext.language/locale`, `Device.timeZone`, `Accessibility.*`, `Retention.*`). Identifier: the SDK hashes its default user identifier before sending |
+| Privacy pages: the draft date stays on the device | `AppModel.draftDateKey` (`league.draftDate.v1`) is written to UserDefaults only; reminders are local notifications (`PK/DraftMatrixUI/Support/DraftReminders.swift`) |
 
 ## Platform
 
@@ -135,7 +138,7 @@ Not claimed: Mac or Vision Pro. No Catalyst or "Designed for iPad" setting is in
 | Support pages: email support@draftmatrix.app (primary), GitHub github.com/grout58 (secondary) | Address supplied by the owner (`SUPPORT_EMAIL` in `build.mjs`, 2026-10-23); the GitHub link is the one already on every legacy support page |
 | Privacy pages: Contact line "Questions? Email us at support@draftmatrix.app, or use the support page linked from the App Store listing.", and "ask for deletion by emailing support@draftmatrix.app or through the support page" | Owner approved showing the address on the privacy pages, and decided to drop the github.com/grout58 contact from them (both 2026-10-23). The Contact sentence is replaced in the dist copies only, between `dm-inline` markers; the legacy sources are unchanged |
 | Support pages: the feedback form sends name, email, app and message | `src/feedback.js`, `src/_worker.js` (`feedback()`) |
-| Privacy: "The DraftMatrix apps themselves still collect no data. This section covers only the optional forms on the draftmatrix.app website." | Same sources as "No account, no tracking, Data Not Collected" above; the forms exist only on the website |
+| Privacy: "This section covers only the optional forms on the draftmatrix.app website. What the apps themselves send is described above." | The forms exist only on the website; the app section is the "Anonymous usage statistics" row under Pricing and Pro |
 | Privacy: the email list stores the address, which sport page(s), and first and latest signup time | `src/_worker.js` `subscribe()` stores `{sport, sports, ts, firstTs}` under `email:<address>` and nothing else (`sports` is every page, `ts` the latest signup, `firstTs` the first). `worker-test.mjs` asserts the record has exactly these keys |
 | Privacy: list used only for the draft-season cheat sheet and DraftMatrix app news; never sold or shared | Owner's commitments |
 | Privacy: feedback stores the name (optional), email, the app chosen, the message and the time sent; used only to reply | `src/_worker.js` `feedback()` stores `{name, email, app, message, ts}` and nothing else (the user-agent was dropped on 2026-10-23). `worker-test.mjs` asserts the record has exactly these keys |
@@ -226,3 +229,13 @@ Checked against App Store Review Guidelines concerns (accurate marketing, privac
 - *Support contact* (borderline above): resolved. support@draftmatrix.app is the primary contact on all four support pages and is added to the four privacy pages' Contact line and deletion sentence. The `SUPPORT_EMAIL not set` comment and warning are gone from the built site. Make sure the mailbox actually receives mail before deploying.
 - *Turnstile wording*: now "when you use the forms".
 - *Baseball favicon*: the brand motif instead of the football icon.
+
+
+**Follow-up, 2026-11-25 (anonymous analytics, mock picks; branch `analytics-disclosure`, not deployed)**
+
+- The apps gain anonymous funnel analytics (TelemetryDeck) in their next builds, so every "collects no data" / "Data Not Collected" statement is gone: the four privacy pages have an "Anonymous usage statistics" section and a new short version, the home pricing note and the three "Does it collect my data?" answers say what is sent, and the injected website section no longer says the apps collect nothing.
+- This also closes the old open item about the legacy "collects no personal data" headline and its August date. The pages are dated "Effective November 26, 2026": **change that to the deploy date if it slips.**
+- The legacy privacy sources were edited on purpose (README says "never edited"); `scripts/check.py` compares against the committed sources, so it still passes once committed.
+- Pricing: mock drafts have three picks of their own, noted on the home table and the three "What's free?" answers.
+- **Deploy order:** merge this branch when the builds with analytics are submitted, not before the App Privacy label is changed, and not after the builds go live.
+- Not claimed: TelemetryDeck's own handling (IP addresses, retention). The pages link to its privacy policy instead.

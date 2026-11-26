@@ -367,7 +367,7 @@ function privacySection(support) {
 </style>
 <h2 id="email-list">Website email list and feedback form</h2>
 <p><em>Added October 23, 2026</em></p>
-<p>The DraftMatrix apps themselves still collect no data. This section covers only the optional forms on the draftmatrix.app website.</p>
+<p>This section covers only the optional forms on the draftmatrix.app website. What the apps themselves send is described above.</p>
 <p><strong>Email list.</strong> If you sign up, we store your email address, which sport page(s) you signed up from, and when you first and most recently signed up. We use it only to send the draft-season cheat sheet and DraftMatrix app news.${BUTTONDOWN ? ` ${BUTTONDOWN_EMAIL_LIST}` : ""}</p>
 <p><strong>Feedback form.</strong> If you send feedback, we store your name (optional), your email address, the app you chose, your message, and the time you sent it. We use it only to reply to you.</p>
 <p>Both are stored with ${esc(PROVIDER)}, and kept until you unsubscribe or ask us to delete them. You can unsubscribe anytime, or ask for deletion ${MAILTO ? `by emailing ${MAILTO} or ` : ""}through the <a href="${support}">support page</a>. ${BUTTONDOWN ? "We never sell them, and share them only with the providers named here." : "We never sell or share them."}</p>
