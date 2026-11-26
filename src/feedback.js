@@ -1,7 +1,20 @@
 // Feedback form on the support pages: posts {name, email, app, message, company,
 // turnstileToken} to /api/feedback. Only a 200 with {ok:true} counts as success.
 // The Turnstile widget is reset after every submit (tokens are single-use).
+// Also opens the FAQ <details> a link points at (e.g. /support#keepers), on load
+// and on in-page links, since not every browser opens it by itself.
 (function () {
+  function openTarget() {
+    var id = decodeURIComponent(location.hash.slice(1));
+    var el = id && document.getElementById(id);
+    if (el && el.tagName === "DETAILS" && !el.open) {
+      el.open = true;
+      el.scrollIntoView();
+    }
+  }
+  openTarget();
+  window.addEventListener("hashchange", openTarget);
+
   var MESSAGES = {
     ok: "Thanks. Your message was sent, and we'll reply by email.",
     notLive: "The form isn't live yet — please use the contact link above.",

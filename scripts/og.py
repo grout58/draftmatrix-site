@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
 """Compose the 1200x630 Open Graph images in assets/og/ from real app screenshots.
 
-Run from the repo root after scripts/icons.py:  python3 scripts/og.py
+Run from the repo root after scripts/icons.py:  python3 scripts/og.py [card ...]
+With card names (e.g. `mlb`), only those cards are redrawn. DM_APPS overrides
+the apps directory (e.g. from a git worktree, where ../DraftMatrix isn't beside
+the repo).
 Inputs are the real App Store screenshots in ../DraftMatrix/apps (read only) and
 the real app icons in assets/icons/ (football, hoops, hockey only). Drawn here:
 the sport-tinted background, the brand tile motif (baseball has no app icon, so
 its card uses the motif), the tier chips, the text and the drop shadows. No app
 UI is drawn.
 """
+import os
+import sys
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
-APPS = ROOT.parent / "DraftMatrix" / "apps"
+APPS = Path(os.environ.get("DM_APPS") or ROOT.parent / "DraftMatrix" / "apps")
 OUT = ROOT / "assets" / "og"
 W, H = 1200, 630
 FONT = "/System/Library/Fonts/HelveticaNeue.ttc"  # index 1 = Bold
@@ -77,7 +82,8 @@ CARDS = {
         "bg": "brand",
         "icons": [],  # no released baseball icon: the brand motif instead
         "title": "Fantasy Baseball",
-        "lines": ["Coming January 2027", "A tiered baseball draft board"],
+        "pill": "Coming January 2027",  # in place of the tier chips; no day, the date isn't set
+        "lines": ["A tiered draft board for", "your in-person baseball draft"],
         "foot": "DraftMatrix · iPhone and iPad",
         "shots": [
             "MLBDraftMatrix/AppStore/2.0/iphone-6.9in-1-board-draft-in-progress.png",
@@ -148,6 +154,15 @@ def chips(canvas, x, y, bold):
         x += w + 10
 
 
+def pill(canvas, x, y, label, bold):
+    """A launch-status pill in the tier-2 green, where the other cards have tier chips."""
+    d = ImageDraw.Draw(canvas)
+    f = bold(26)
+    w = d.textlength(label, font=f) + 40
+    d.rounded_rectangle((x, y - 4, x + w, y + 40), 22, fill=TIERS[1])
+    d.text((x + 20, y + 3), label, font=f, fill=(11, 15, 20))
+
+
 def card(name, spec):
     hi, lo = BG[spec["bg"]]
     canvas = gradient(hi, lo).convert("RGBA")
@@ -168,7 +183,10 @@ def card(name, spec):
         canvas.alpha_composite(im, (x, 64))
         x += size + 18
 
-    chips(canvas, 64, 196, bold)
+    if spec.get("pill"):
+        pill(canvas, 64, 196, spec["pill"], bold)
+    else:
+        chips(canvas, 64, 196, bold)
     d.text((64, 248), spec["title"], font=bold(60), fill=(255, 255, 255))
     y = 330
     for line in spec["lines"]:
@@ -198,5 +216,8 @@ def card(name, spec):
 
 
 if __name__ == "__main__":
-    for name, spec in CARDS.items():
-        card(name, spec)
+    names = sys.argv[1:] or list(CARDS)
+    for name in names:
+        if name not in CARDS:
+            sys.exit(f"unknown card {name!r}; one of {', '.join(CARDS)}")
+        card(name, CARDS[name])
