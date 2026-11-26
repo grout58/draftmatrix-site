@@ -370,7 +370,7 @@ def check_files():
     # Privacy blocks must match what the worker stores.
     for out in [o for o in LEGACY.values() if "privacy" in o]:
         block = b"".join(ADDED.findall((DIST / out).read_bytes())).decode()
-        for needed in ["Added October 23, 2026", "collect no data", "Cloudflare Turnstile",
+        for needed in ["Added October 23, 2026", "optional forms on the draftmatrix.app website", "Cloudflare Turnstile",
                        "https://www.cloudflare.com/privacypolicy/"]:
             if needed not in block:
                 fail(f"{out} privacy block is missing {needed!r}")
